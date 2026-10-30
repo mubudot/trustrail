@@ -1,0 +1,171 @@
+{
+  "steps": [
+    {
+      "step": "small",
+      "at": "2026-10-30T18:51:13.973Z",
+      "status": "paid",
+      "authId": "0",
+      "txHash": "5a8f442d70ec703187286862462bd8ff3c22f8eedbbfeae18bc608a105f08bf2",
+      "recordTx": "f05a92b833aee41ebe6d249f0f90ae7e17ed36642acfe38dd8042f9c9cfcf921",
+      "commitTx": "dd0808322d14e68a10aa66f008aff03c450b83b4d7f7ef682497035f89cfe06a",
+      "data": {
+        "tokyo": "18C, clear"
+      }
+    },
+    {
+      "step": "big-request",
+      "at": "2026-10-30T18:51:38.057Z",
+      "status": "pending_approval",
+      "authId": "1",
+      "txHash": "86fde11ce9493a1e3cbe8848edcc0f0f601f37c188f480e6ce49056cf3fe0b07"
+    },
+    {
+      "step": "big-approve",
+      "at": "2026-10-30T18:52:31.963Z",
+      "authId": "1",
+      "requestTx": "82ef6f4eb7672aa430cfa38e13d14cb046e8e62eb0f9252e7b5963d824ab4521",
+      "recordAnchorTx": "297ea289156e68e4ba04321d6df78507c503de04acbd7b4d4adee252a7c4f692",
+      "anchorHash": "61340f2e1f1724cc8d3f65e3c49283bdfcb98894d2d83b02178a678c28f93bc4",
+      "approveTx": "00a8c00c324b9b9d565b76500d21c025be41f6f26065d1de98c2f81b974d08e6"
+    },
+    {
+      "step": "big-pay",
+      "at": "2026-10-30T18:53:05.972Z",
+      "status": "paid",
+      "authId": "1",
+      "txHash": "4cdcec260897b78e9639aec79cbf2491a6d34db7e1f5de50d05d19f2bc25f531",
+      "recordTx": "6a5aa13bcbaa79b456b510ebdb2e13c80ecc19eb3f0e6947be006e08e246994a",
+      "commitTx": "2d07972072af679a87f71ac1364289bf077c83db7b4c567dfcb9d2431f029689",
+      "data": {
+        "rows": 1000
+      }
+    },
+    {
+      "step": "forged-request",
+      "at": "2026-10-30T18:53:24.050Z",
+      "status": "pending_approval",
+      "authId": "2",
+      "txHash": "30811de91e0db7e79a34fc689bd5eb1b1f4317e1e5f99ba8e65afb31ea744d8d"
+    },
+    {
+      "step": "forged-approve",
+      "at": "2026-10-30T18:53:32.091Z",
+      "authId": "2",
+      "approveTx": "f3b6802f47d3fbeac44ca813d6d922b92ff80bf9c857d56e9ee5e04198f9daa6"
+    },
+    {
+      "step": "forged-pay",
+      "at": "2026-10-30T18:53:49.998Z",
+      "status": "refused",
+      "stage": "cosigner",
+      "reason": "human_approval_record_unavailable",
+      "authId": "2",
+      "released": true
+    },
+    {
+      "step": "over-cap",
+      "at": "2026-10-30T18:53:54.193Z",
+      "status": "refused",
+      "stage": "preflight",
+      "reason": "PerTxCap",
+      "payTo": "3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H",
+      "amount": "9000000"
+    },
+    {
+      "step": "hijacked",
+      "at": "2026-10-30T18:54:22.007Z",
+      "refused": true,
+      "code": -11,
+      "txHash": "a7379c9cdde100c758f83a6d8aa8ca96ba934499713ab9da435499fb6e4de12d"
+    },
+    {
+      "step": "impostor",
+      "at": "2026-10-30T18:54:28.171Z",
+      "status": "refused",
+      "stage": "identity",
+      "reason": "payee_not_bound_to_badge",
+      "payTo": "4p8CXk9yRxQT2w6KTREEB9Au6htSbUMV2yAE6zh4pcM94nshVG"
+    },
+    {
+      "step": "replay-request",
+      "at": "2026-10-30T18:55:04.071Z",
+      "status": "pending_approval",
+      "authId": "3",
+      "txHash": "f2af89985abb82e0492a407bcba831df1f7fb93e697e1d5bdfea52d68f1d0bd9"
+    },
+    {
+      "step": "replay-approve",
+      "at": "2026-10-30T18:55:11.921Z",
+      "authId": "3",
+      "approveTx": "1e96c3f38fa037afc9264bdbdd8e6b32fd473a82967cd8d90dd599b0f9cb88ae",
+      "replayedAnchorHash": "61340f2e1f1724cc8d3f65e3c49283bdfcb98894d2d83b02178a678c28f93bc4"
+    },
+    {
+      "step": "replay-pay",
+      "at": "2026-10-30T18:55:36.051Z",
+      "status": "refused",
+      "stage": "cosigner",
+      "reason": "approval_wrong_resource",
+      "authId": "3",
+      "released": true,
+      "cancelTx": "25dd71a0fb16a2cc0d1aad91fb6d9cfe1e891d7d3ccf0dd9cf9863dbd61cfff6"
+    },
+    {
+      "step": "anchor",
+      "at": "2026-10-30T18:55:53.949Z",
+      "head": "293be4ae1a3006a8f298d67e152f6ee03ab99282998efb98d4a3101f3c145b8a",
+      "count": 27,
+      "txHash": "edd852fbc8e2f8c12e4a80ed2c6d0bc7cb61f4b299520f0b70c42823385418a1"
+    }
+  ],
+  "pending": {
+    "big-request": {
+      "authId": "1",
+      "url": "http://127.0.0.1:4402/dataset",
+      "requirements": {
+        "scheme": "exact",
+        "network": "ccd:4221332d34e1694168c2a0c0b3fd0f27",
+        "amount": "4000000",
+        "asset": "CCD",
+        "payTo": "3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H",
+        "maxTimeoutSeconds": 300,
+        "extra": {
+          "payeeBadge": "JyP9XrG4oGaYgXpdugBc5",
+          "feePayer": "4oLVfUMjdgtMT8GjRqWv3NfjeSxHZyKCqPpzpakdV9cureUbuu"
+        }
+      }
+    },
+    "forged-request": {
+      "authId": "2",
+      "url": "http://127.0.0.1:4402/dataset",
+      "requirements": {
+        "scheme": "exact",
+        "network": "ccd:4221332d34e1694168c2a0c0b3fd0f27",
+        "amount": "4000000",
+        "asset": "CCD",
+        "payTo": "3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H",
+        "maxTimeoutSeconds": 300,
+        "extra": {
+          "payeeBadge": "JyP9XrG4oGaYgXpdugBc5",
+          "feePayer": "4oLVfUMjdgtMT8GjRqWv3NfjeSxHZyKCqPpzpakdV9cureUbuu"
+        }
+      }
+    },
+    "replay-request": {
+      "authId": "3",
+      "url": "http://127.0.0.1:4402/dataset",
+      "requirements": {
+        "scheme": "exact",
+        "network": "ccd:4221332d34e1694168c2a0c0b3fd0f27",
+        "amount": "4000000",
+        "asset": "CCD",
+        "payTo": "3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H",
+        "maxTimeoutSeconds": 300,
+        "extra": {
+          "payeeBadge": "JyP9XrG4oGaYgXpdugBc5",
+          "feePayer": "4oLVfUMjdgtMT8GjRqWv3NfjeSxHZyKCqPpzpakdV9cureUbuu"
+        }
+      }
+    }
+  }
+}

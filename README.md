@@ -1,92 +1,119 @@
-# TrustRail — accountable spending for AI agents on Concordium
+# TrustRail — no verified human, no payment
 
-Give an AI agent a wallet without giving it your wallet. A verified human owner sets a spending
-policy on chain; the agent pays other agents and APIs with **x402** on Concordium, but every payment
-must first get an on-chain authorisation from the **agent_spend_guard** contract, and the agent's
-paying wallet is **2-of-2**: the agent holds one key, a small deterministic co-signer holds the
-other and signs only transfers that exactly match an approved authorisation. Payees must present a
-**Verified by Concordium** badge that is bound to the account being paid. Every step leaves an
-on-chain event and a hash-chained audit entry.
+**An AI agent pays other agents over x402 on Concordium from a 2-of-2 wallet whose second key
+signs a large payment only after a zero-knowledge proof shows that the identity-verified owner
+approved *that exact payment* — with the proof anchored on chain for audit.**
 
-Status: early build for the Concordium Trusted Agents Hackathon (Encode Club). Contract and offline
-client are working and tested; **testnet deployment is not done yet** (see [STATUS.md](STATUS.md)).
+Live on Concordium **testnet**: guard contract [<13037,0>](https://ccdexplorer.io/testnet/instance/13037/0),
+Verified-by-Concordium badges for both agents, real x402 settlements, ZK approval records and an
+anchored audit log. Every link: [docs/TESTNET.md](docs/TESTNET.md). Re-check it yourself without any
+key: `cd live && npm ci && npm run verify`.
+
+## Why this is different from "caps + an approve button"
+
+Most agent wallets stop at a spend limit and a human-in-the-loop flag that any process holding
+the owner key can flip. TrustRail makes the human part *cryptographic and specific*:
+
+1. **The approval is a Concordium Verify-and-Access proof**, made from the owner account's
+   identity credential (testnet IdP): "I am an adult with a valid Concordium identity, and I hold
+   the credential of the account that owns this agent." No personal data is revealed.
+2. **The proof is bound to one payment.** The verification request is anchored on chain and names
+   the guard, the authorisation id, the payee, the amount and the purpose hash. A valid proof for
+   payment #1 cannot approve payment #2 (we tried — [docs/TESTNET.md](docs/TESTNET.md), row 4).
+3. **Nothing pays without it.** The agent's paying wallet is a native Concordium **2-of-2** account.
+   The agent holds key 0; a small deterministic co-signer holds key 1 and signs only a transfer that
+   matches an approved on-chain authorisation *and* whose human-approval record re-verifies against
+   the chain. Owner key alone + made-up proof → no payment (row 3).
+4. **Afterwards anyone can audit it.** The Verification Audit Record's hash sits in the guard's
+   authorisation (`human_proof`) and in a RegisterData anchor; the agent's hash-chained audit log
+   head is anchored with `anchorAudit`. That is an EU AI Act Art. 12-style record with a lawful
+   route back to an accountable person (Concordium identity disclosure only via Privacy Guardians
+   and a court order).
+
+## How a payment flows
 
 ```
-owner (Concordium account, identity-backed)          payee agent / API (x402 seller)
-  | registerAgent(badge, policy, allowlist)              ^  402 PaymentRequirements (+ badge)
-  | approve / reject / pause / withdraw                  |  200 + PAYMENT-RESPONSE
-  v                                                      |
-agent_spend_guard ──balanceOf──> CIS-8004 Agent Registry |  (owner must hold the agent NFT)
-  ^ authorize / recordSettlement                         |
-  |                                                      |
-AI agent ── preflight ── badge check ── sponsored V1 transfer, signed by
-            (same rules)  (payTo bound   key 0 (agent) + key 1 (co-signer, only if it
-                          to the badge)  matches an Approved, unexpired authorisation)
-                                         ──> facilitator sponsors fees + settles
+seller (x402, badge #978)        buyer agent (badge #977, owned by the verified human)
+  402 + PaymentRequirements  ->  1. payee badge check (hosted Agent Registry: Active, card hash, payTo bound)
+                                 2. local preflight (same policy as the contract)
+                                 3. guard.authorize  -> on chain: caps, allowlist, threshold
+                                    > 2 CCD: Pending  -> 4. owner: ZK proof (Verify and Access) -> audit
+                                                           record anchored -> guard.approve(id, anchorHash)
+                                 5. agent signs key 0 of the 2-of-2 wallet
+                                 6. co-signer: re-checks auth + tx + human proof, commitPayment (once) ,
+                                    signs key 1
+  <- PAYMENT-SIGNATURE ---------- 7. x402 retry; facilitator (@x402/concordium) sponsors + settles
+                                 8. guard.recordSettlement(id, txHash); audit entry; anchorAudit(head)
 ```
 
-## What stops what
+## What stops what (all demonstrated on testnet)
 
-| The agent (or whoever hijacked it) tries to … | Stopped by |
+| The agent, a hijacker, or a compromised owner key tries to … | Stopped by |
 | --- | --- |
-| pay an address it was talked into | payee badge check (`payee_not_bound_to_badge`), contract allowlist (`NotAllowlisted`) |
-| drain the budget in one or many payments | per-tx and UTC-daily caps on chain; pending requests reserve budget |
-| make a large payment without a human | approval threshold → `Pending` until the owner approves |
-| pay without asking the contract, or pay more than authorised | 2-of-2 wallet: the co-signer signs only the exact authorised payee/amount/asset/purpose, after committing that transfer's digest on chain (once, before expiry; never refundable afterwards) |
-| keep going after misbehaving | owner pause (global/per agent); the agent can pause itself; losing the badge auto-pauses (`recheckBadge`) |
-| hide what it did | contract events + authorisation records (committed digest, x402 settlement tx hash); hash-chained off-chain log (preflight refusals are off-chain only) |
+| pay an address it was talked into | payee badge must be bound to `payTo` (`payee_not_bound_to_badge`); on-chain allowlist |
+| pay more than the per-payment / daily cap, even skipping the client | guard contract rejects on chain (`PerTxCap`, `DailyCap`) |
+| make a large payment without a human | Pending until approved; the co-signer needs a verifying ZK approval record |
+| approve with the owner key and a fake or replayed proof | co-signer re-verifies proof, credential owner, resource id and anchor hash → refuses and cancels |
+| pay twice from one approval / change the transfer after approval | `commitPayment` stores the exact sign-hash once; co-signer signs only that |
+| quietly rewrite history | guard events + authorisation records; ZK audit records anchored; audit-log head anchored |
 
 ## Layout
 
 ```
-contract/            Rust smart contract (concordium-std 11)
-  src/policy.rs      pure deterministic policy (unit-tested natively)
-  src/spend.rs       authorize / approve / reject / cancel / recordSettlement
-  src/admin.rs       init, agent registry, policy, pause, funds, badge re-check
-  src/badge.rs       CIS-8004 (CIS-2 balanceOf) badge ownership check
-  src/views.rs       views + on-chain preflight
-  src/{types,error,events}.rs
-  tests/guard.rs     end-to-end tests of the Wasm in an in-memory chain
-agent/               Node client (no dependencies)
-  src/agent.mjs      TrustedAgent: badge → preflight → authorize → co-signed x402 → settle
-  src/policy/        JS mirror of the policy + error codes
-  src/payments/      x402 client + sponsored-transfer payload
-  src/cosigner/      the deterministic co-signer
-  src/identity/      payee badge check (fixture or hosted Agent Registry REST)
-  src/audit/         hash-chained audit log
-  src/chain/         guard adapter (mock now; testnet adapter next)
-  src/mock/          offline world: ledger, facilitator (9 x402 rules), sellers
-spec/policy_vectors.json  shared vectors run by BOTH the Rust and the JS tests
+contract/            Rust smart contract agent_spend_guard (concordium-std 11), 27 tests
+  src/spend.rs       authorize / approve(id, human_proof) / reject / cancel / commitPayment / recordSettlement
+  src/audit.rs       anchorAudit (audit-log head on chain)
+  src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
+agent/               Offline reference client + mock chain (zero dependencies), 27 tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 17 offline tests
+  src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
+  src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
+  src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402
+  src/guard-client.mjs     schema-typed guard calls;  src/registry-mcp.mjs  hosted Agent Registry MCP
+  tools/                   identity, accounts, faucet, deploy, badges/cards, verify-testnet, doc generator
+  demo/testnet.mjs         the live scenarios;  state/  public deployment record + evidence
+  deployed/                the exact module + schema deployed on testnet
+docs/TESTNET.md      every address and transaction with CCDExplorer links
 ```
 
-## Run it (offline, no keys)
+## Run it
 
 ```bash
-# client: tests + demo (Node 20+)
+# offline (no keys, no network)
 cd agent && npm test && npm run demo:mock
+cd contract && cargo test            # after ./scripts/build-wasm.sh (Rust 1.99.1 + wasm32v1-none)
+cd live && npm ci && npm test
 
-# contract: needs Rust (rust-toolchain.toml pins 1.99.1 + wasm32v1-none)
-./scripts/build-wasm.sh            # builds build/agent_spend_guard.wasm (+ test-only registry)
-cd contract && cargo test          # unit tests + shared vectors + Wasm integration tests
+# read-only check of the live testnet deployment (no keys)
+cd live && npm run verify
 ```
 
-Current counts: contract 9 unit + 16 integration, client 24 (see STATUS.md).
-
-`build-wasm.sh` uses `cargo concordium build --schema-embed` when cargo-concordium is installed and
-always also builds the raw module for the tests.
-No network access and no keys are needed for any of the above.
+Reproducing the deployment from scratch (own throwaway testnet identity, accounts, faucet,
+contract, badges, demo) is scripted in `live/tools/` and described in [STATUS.md](STATUS.md).
 
 ## Concordium components used
 
-- **Agent Registry / Verified by Concordium badge** (CIS-8004, testnet `<12802,0>`): the guard binds
-  each agent to a badge held by the owner; the client checks payee badges.
-- **x402 on Concordium** (exact scheme, sponsored V1 transfer — the agent needs no CCD for fees).
-- **Sponsored transactions** via the x402 facilitator.
-- **Concordium ID**: every account is identity-backed; the owner is the accountable human.
+- **Concordium ID / Verify and Access** (Verifiable Presentation V1, account-credential ZK proof,
+  Verification Audit Record + on-chain anchors) — approver = verified human bound to the owner account.
+- **Agent Registry (CIS-8004) + Verified by Concordium badge** — both agents registered via the
+  hosted MCP builders; Agent Cards with the badge extension; `check-badge` passes; the guard checks
+  on chain that the owner holds the agent NFT.
+- **x402 on Concordium** (`@x402/concordium` exact scheme) with **sponsored transactions** — the
+  agent's wallet pays no fees.
+- **Native multi-key accounts** — the 2-of-2 wallet is what makes the co-signer binding.
+
+## Path to production
+
+Same contract and flow on mainnet: the owner's identity from a real IdP (passport + liveness in the
+Concordium wallet); the approval proof requested by the owner's wallet (Concordium ID app) instead of
+a script; badges from the mainnet registry `<10082,0>`; the co-signer run by the owner or a custodian
+(e.g. Dfns) with an HSM-held key; budgets in a PLT stablecoin (EURR/USDR) — the code path for PLT
+transfers exists in the policy, not yet in the live buyer; a hosted facilitator for sponsorship.
 
 ## AI assistance
 
-Built with AI coding assistants (design, code and review), with all code run and tested locally.
+Built with AI coding assistants (design, code and review), with all code run and tested locally and
+on testnet.
 
 ## License
 

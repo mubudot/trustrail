@@ -97,6 +97,11 @@ pub struct Authorization {
     pub commitment:   Option<HashSha2256>,
     /// Settlement transaction hash (x402) — set by `recordSettlement`.
     pub settlement:   Option<HashSha2256>,
+    /// Anchor hash of the Concordium Verification Audit Record (Verify and Access, ZK proof that a
+    /// verified adult holding the owner's account credential approved *this* authorisation) — set
+    /// by `approve`. The contract cannot check ZK proofs; the co-signer verifies the record before
+    /// it signs, and anyone can re-verify it against the on-chain anchor.
+    pub human_proof:  Option<HashSha2256>,
 }
 
 #[derive(Serial, DeserialWithState)]
@@ -170,6 +175,21 @@ pub struct AuthorizeOutcome {
 pub struct PreviewParams {
     pub agent:   AccountAddress,
     pub request: AuthorizeParams,
+}
+
+#[derive(Serialize, SchemaType)]
+pub struct ApproveParams {
+    pub id:          u64,
+    /// Anchor hash of the Verification Audit Record proving the approver is a verified human.
+    pub human_proof: HashSha2256,
+}
+
+#[derive(Serialize, SchemaType)]
+pub struct AnchorAuditParams {
+    /// Head of the off-chain hash-chained audit log (SHA-256).
+    pub head:  HashSha2256,
+    /// Number of entries covered by `head`.
+    pub count: u64,
 }
 
 #[derive(Serialize, SchemaType)]

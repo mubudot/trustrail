@@ -1,0 +1,72 @@
+{
+  "name": "TrustRail buyer agent",
+  "description": "An AI purchasing agent that pays other agents and APIs with x402 on Concordium, but only inside an on-chain spend policy (agent_spend_guard). Payments above the approval threshold need a zero-knowledge proof that a verified adult holding the owner's identity-backed account approved that exact payment. Testnet demo.",
+  "url": "https://trustrail-204-44-110-122.sslip.io/agents/977.json",
+  "version": "1.0.0",
+  "defaultInputModes": [
+    "text/markdown",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/markdown",
+    "application/json"
+  ],
+  "authentication": {
+    "schemes": []
+  },
+  "skills": [
+    {
+      "id": "x402-buy",
+      "name": "Buy data over x402",
+      "description": "Pays x402 resources in CCD within per-transaction and daily caps, only to allowlisted, badge-verified payees.",
+      "tags": [
+        "x402",
+        "payments",
+        "spend-policy"
+      ]
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "extensions": [
+      {
+        "uri": "https://docs.concordium.com/a2a-extensions/concordium-badge/v1",
+        "description": "Verified by Concordium badge — on-chain agent identity in a CIS-8004 registry",
+        "required": false,
+        "params": {
+          "tokenAddress": "ccd:4221332d34e1694168c2a0c0b3fd0f27/cis-2:JyP9XqAasF5crQaoy7nMw",
+          "owner": {
+            "account": "ccd:4221332d34e1694168c2a0c0b3fd0f27:4quNUwSZDXiz2zb6jGQ8ytj6UX3ASqwyoBt4owTc5k9h6mMnMU"
+          },
+          "agentWallet": "ccd:4221332d34e1694168c2a0c0b3fd0f27:4quNUwSZDXiz2zb6jGQ8ytj6UX3ASqwyoBt4owTc5k9h6mMnMU",
+          "contracts": {
+            "cis8004": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0",
+            "cis8": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0"
+          },
+          "services": {
+            "spendGuard": "ccd:testnet:contract:13037:0",
+            "paymentWallet": "44e2e4v332fXTACRszqVBwJRg2SuhTLAaBQ5iPPcK7N7XH8doo",
+            "network": "concordium:testnet"
+          },
+          "verify": "Resolve tokenAddress via CIS-8004 agent_of; confirm owner + status=Active + card SHA-256 == metadata_hash.",
+          "verification": {
+            "service": "Concordium Agent Registry",
+            "verifyUrl": "https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9XqAasF5crQaoy7nMw",
+            "mcp": "https://agent-registry-mcp.concordium.com/mcp",
+            "docs": "https://docs.concordium.com/en/mainnet/technical-reference/agent-registry/concordium-badge.html"
+          }
+        }
+      }
+    ]
+  },
+  "provider": {
+    "organization": "TrustRail (hackathon project)"
+  },
+  "registrations": [
+    {
+      "agentId": 977,
+      "agentRegistry": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0"
+    }
+  ]
+}

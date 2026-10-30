@@ -22,7 +22,7 @@ pub enum Event {
     #[concordium(tag = 8)]
     PendingApproval { id: u64, agent: AccountAddress, payee: AccountAddress, amount: u64, mode: PayMode, purpose_hash: HashSha2256 },
     #[concordium(tag = 9)]
-    Approved { id: u64 },
+    Approved { id: u64, human_proof: HashSha2256 },
     #[concordium(tag = 10)]
     Rejected { id: u64 },
     #[concordium(tag = 11)]
@@ -39,5 +39,7 @@ pub enum Event {
     CosignerSet { cosigner: Option<AccountAddress> },
     #[concordium(tag = 17)]
     PaymentCommitted { id: u64, digest: HashSha2256 },
+    #[concordium(tag = 18)]
+    AuditAnchored { by: AccountAddress, head: HashSha2256, count: u64 },
 }
 

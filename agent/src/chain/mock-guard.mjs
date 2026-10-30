@@ -104,7 +104,7 @@ export class MockGuardChain {
     const id = this.nextAuthId++;
     const auth = {
       id, agent: sender, generation: rec.generation, payee, asset, amount, mode, purposeHash,
-      status, createdAt: now, expiresAt: now + rec.policy.authTtlMs, day: today, commitment: null, settlement: null,
+      status, createdAt: now, expiresAt: now + rec.policy.authTtlMs, day: today, commitment: null, settlement: null, humanProof: null,
     };
     this.auths.set(id, auth);
     if (status === 'Pending' && mode === 'Escrow') this.escrowReserved += amount;
@@ -113,8 +113,13 @@ export class MockGuardChain {
     return { id, status, expiresAt: auth.expiresAt };
   }
 
-  approve(sender, id) {
+  /**
+   * Owner approval. `humanProof` is the anchor hash of the Verification Audit Record proving a
+   * verified human approved this authorisation (the contract stores it; the co-signer verifies it).
+   */
+  approve(sender, id, humanProof) {
     this.#owner(sender);
+    if (!/^[0-9a-f]{64}$/.test(humanProof ?? '')) throw new GuardError('ParseParams', 'humanProof must be a 32-byte hex hash');
     if (this.paused) throw new GuardError('Paused');
     const auth = this.#auth(id);
     if (auth.status !== 'Pending') throw new GuardError('WrongStatus');
@@ -126,11 +131,13 @@ export class MockGuardChain {
     if (auth.mode === 'Escrow') {
       this.escrowReserved -= auth.amount;
       auth.status = 'Settled';
-      this.#emit('Approved', { id: auth.id });
+      auth.humanProof = humanProof;
+      this.#emit('Approved', { id: auth.id, humanProof });
       this.#payEscrow(auth);
     } else {
       auth.status = 'Approved';
-      this.#emit('Approved', { id: auth.id });
+      auth.humanProof = humanProof;
+      this.#emit('Approved', { id: auth.id, humanProof });
     }
   }
 
@@ -179,6 +186,12 @@ export class MockGuardChain {
     auth.settlement = txHash;
     this.settledTxs.set(txHash, auth.id);
     this.#emit('Settled', { id: auth.id, txHash });
+  }
+
+  /** Anchor the head of the hash-chained audit log (owner, a registered agent or the co-signer). */
+  anchorAudit(sender, { head, count }) {
+    if (sender !== this.owner && sender !== this.cosigner && !this.agents.has(sender)) throw new GuardError('NotPermitted');
+    this.#emit('AuditAnchored', { by: sender, head, count });
   }
 
   #payEscrow(auth) {

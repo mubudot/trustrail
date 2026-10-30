@@ -47,9 +47,36 @@ test('above the approval threshold: pending until the owner approves, then paid'
   // the co-signer will not sign a pending authorisation, even if the agent tries
   assert.equal((await w.agent.resume(r.authId)).reason, 'status_Pending');
   const r2 = await w.agent.buy('https://data.example/dataset');
-  w.guard.approve(ACCOUNTS.owner, r2.authId);
+  w.humanApprove(r2.authId);
   const paid = await w.agent.resume(r2.authId);
   assert.equal(paid.status, 'paid');
+});
+
+test('owner approval without a valid human proof is not enough: co-signer refuses and releases', async () => {
+  const w = createWorld();
+  const r = await w.agent.buy('https://data.example/dataset');
+  w.guard.approve(ACCOUNTS.owner, r.authId, 'ab'.repeat(32)); // owner key alone, made-up proof
+  const out = await w.agent.resume(r.authId);
+  assert.equal(out.status, 'refused');
+  assert.equal(out.reason, 'human_approval_invalid');
+  assert.equal(w.guard.authorization(r.authId).auth.status, 'Cancelled');
+});
+
+test('a valid proof for another authorisation does not transfer (replay)', async () => {
+  const w = createWorld();
+  const a = await w.agent.buy('https://data.example/dataset');
+  const proofA = w.humanApprove(a.authId);
+  const b = await w.agent.buy('https://data.example/dataset');
+  w.guard.approve(ACCOUNTS.owner, b.authId, proofA);
+  assert.equal((await w.agent.resume(b.authId)).reason, 'human_approval_invalid');
+  assert.equal((await w.agent.resume(a.authId)).status, 'paid');
+});
+
+test('audit head can be anchored on chain by accountable parties only', () => {
+  const w = createWorld();
+  w.guard.anchorAudit(ACCOUNTS.agent, { head: 'cd'.repeat(32), count: 3 });
+  assert.equal(w.guard.events.at(-1).type, 'AuditAnchored');
+  assert.throws(() => w.guard.anchorAudit('stranger', { head: 'cd'.repeat(32), count: 3 }), /NotPermitted/);
 });
 
 test('daily cap stops a loop of small payments', async () => {

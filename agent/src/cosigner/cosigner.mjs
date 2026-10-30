@@ -21,8 +21,10 @@ export class Cosigner {
    *          agentAccount: string, agentPublicKey: string, clock?: () => number}} opts
    *   `account` is the co-signer's own Concordium account (the guard's configured `cosigner`).
    */
-  constructor({ guard, account, keyPair, agentAccount, agentPublicKey, clock = () => Date.now() }) {
-    Object.assign(this, { guard, account, keyPair, agentAccount, agentPublicKey, clock });
+  /*   `verifyHumanApproval(authId, humanProof)` must return true only for a verified record (live:
+   *   Concordium Verify-and-Access audit record re-checked against the chain; see live/src). */
+  constructor({ guard, account, keyPair, agentAccount, agentPublicKey, verifyHumanApproval = () => false, clock = () => Date.now() }) {
+    Object.assign(this, { guard, account, keyPair, agentAccount, agentPublicKey, verifyHumanApproval, clock });
   }
 
   /** Returns the co-signature (hex) or throws CosignRefused. */
@@ -41,6 +43,10 @@ export class Cosigner {
     if (!current || current.generation !== a.generation) no('stale_generation');
     if (current.paused) no('agent_paused');
     if (!current.allowlist.includes(a.payee)) no('payee_not_allowlisted');
+    // A payment above the threshold went through owner approval: it must carry a human proof
+    // that verifies for THIS authorisation.
+    if (a.amount > current.policy.approvalThreshold && !a.humanProof) no('human_approval_missing');
+    if (a.humanProof && !this.verifyHumanApproval(authId, a.humanProof)) no('human_approval_invalid');
 
     if (tx?.version !== 1) no('tx_version');
     const h = tx.header ?? {};

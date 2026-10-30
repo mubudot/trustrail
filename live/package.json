@@ -1,0 +1,22 @@
+{
+  "name": "trustrail-live",
+  "private": true,
+  "type": "module",
+  "description": "Concordium testnet adapters for TrustRail (web-sdk, x402, Agent Registry)",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@concordium/web-sdk": "^12.0.2",
+    "@x402/concordium": "^2.29.0",
+    "@x402/core": "^2.29.0",
+    "@x402/express": "^2.29.0",
+    "@x402/fetch": "^2.29.0",
+    "express": "^4.22.3"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "verify": "node tools/verify-testnet.mjs",
+    "demo": "node demo/testnet.mjs"
+  }
+}

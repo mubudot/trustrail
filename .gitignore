@@ -10,3 +10,7 @@ node_modules/
 /.tmp/
 codex_*
 /build/
+
+# live testnet keys/state (never commit)
+/live/.secrets/
+/live/state/*.local.json

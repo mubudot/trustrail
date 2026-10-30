@@ -1,0 +1,69 @@
+{
+  "name": "TrustRail demo data seller",
+  "description": "A demo x402 resource server on Concordium testnet that sells small data items for CCD. Used as the verified payee in the TrustRail demo.",
+  "url": "https://trustrail-204-44-110-122.sslip.io/agents/978.json",
+  "version": "1.0.0",
+  "defaultInputModes": [
+    "text/markdown",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/markdown",
+    "application/json"
+  ],
+  "authentication": {
+    "schemes": []
+  },
+  "skills": [
+    {
+      "id": "x402-sell",
+      "name": "Sell data over x402",
+      "description": "Returns HTTP 402 with Concordium exact-scheme payment requirements, settles through an x402 facilitator.",
+      "tags": [
+        "x402",
+        "seller"
+      ]
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "extensions": [
+      {
+        "uri": "https://docs.concordium.com/a2a-extensions/concordium-badge/v1",
+        "description": "Verified by Concordium badge — on-chain agent identity in a CIS-8004 registry",
+        "required": false,
+        "params": {
+          "tokenAddress": "ccd:4221332d34e1694168c2a0c0b3fd0f27/cis-2:JyP9XrG4oGaYgXpdugBc5",
+          "owner": {
+            "account": "ccd:4221332d34e1694168c2a0c0b3fd0f27:3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H"
+          },
+          "agentWallet": "ccd:4221332d34e1694168c2a0c0b3fd0f27:3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H",
+          "contracts": {
+            "cis8004": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0",
+            "cis8": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0"
+          },
+          "services": {
+            "network": "concordium:testnet"
+          },
+          "verify": "Resolve tokenAddress via CIS-8004 agent_of; confirm owner + status=Active + card SHA-256 == metadata_hash.",
+          "verification": {
+            "service": "Concordium Agent Registry",
+            "verifyUrl": "https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9XrG4oGaYgXpdugBc5",
+            "mcp": "https://agent-registry-mcp.concordium.com/mcp",
+            "docs": "https://docs.concordium.com/en/mainnet/technical-reference/agent-registry/concordium-badge.html"
+          }
+        }
+      }
+    ]
+  },
+  "provider": {
+    "organization": "TrustRail (hackathon project)"
+  },
+  "registrations": [
+    {
+      "agentId": 978,
+      "agentRegistry": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0"
+    }
+  ]
+}

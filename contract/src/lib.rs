@@ -23,6 +23,7 @@
 use concordium_std::*;
 
 mod admin;
+mod audit;
 mod badge;
 mod error;
 mod events;

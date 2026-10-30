@@ -110,16 +110,16 @@ fn pending_needs_owner_and_reserves_budget() {
     assert_eq!(out.status, AuthStatus::Pending);
     assert_eq!(env.agent().spent_today_now, 100);
     // agent cannot approve itself, cannot settle a pending one
-    assert_eq!(env.fails(AGENT, "approve", &out.id), Error::NotOwner);
+    assert_eq!(env.fails(AGENT, "approve", &ap(out.id)), Error::NotOwner);
     let s = SettleParams { id: out.id, tx_hash: HashSha2256([1; 32]) };
     assert_eq!(env.fails(AGENT, "recordSettlement", &s), Error::WrongStatus);
     // reject releases budget
     env.ok(OWNER, "reject", &out.id);
     assert_eq!(env.agent().spent_today_now, 0);
-    assert_eq!(env.fails(OWNER, "approve", &out.id), Error::WrongStatus);
+    assert_eq!(env.fails(OWNER, "approve", &ap(out.id)), Error::WrongStatus);
     // approve path
     let out2 = env.auth(90, PayMode::X402).unwrap();
-    env.ok(OWNER, "approve", &out2.id);
+    env.ok(OWNER, "approve", &ap(out2.id));
     assert_eq!(env.authorization(out2.id).auth.status, AuthStatus::Approved);
 }
 
@@ -131,7 +131,7 @@ fn expiry_blocks_approval_and_settlement() {
     let approved = env.auth(10, PayMode::X402).unwrap();
     env.tick_ms(60_000);
     assert!(env.authorization(pending.id).expired);
-    assert_eq!(env.fails(OWNER, "approve", &pending.id), Error::Expired);
+    assert_eq!(env.fails(OWNER, "approve", &ap(pending.id)), Error::Expired);
     // the co-signer cannot commit after expiry
     let c = CommitParams { id: approved.id, digest: HashSha2256([1; 32]) };
     assert_eq!(env.fails(COSIGNER, "commitPayment", &c), Error::Expired);
@@ -158,7 +158,7 @@ fn escrow_pays_from_contract_and_reserves_liquidity() {
     // owner cannot withdraw reserved liquidity
     let free = v.balance.micro_ccd - 80;
     assert_eq!(env.fails(OWNER, "withdraw", &Amount::from_micro_ccd(free + 1)), Error::InsufficientFunds);
-    env.ok(OWNER, "approve", &pend.id);
+    env.ok(OWNER, "approve", &ap(pend.id));
     assert_eq!(env.balance(PAYEE), before + Amount::from_micro_ccd(110));
     let v: ContractView = env.view("view", &());
     assert_eq!(v.escrow_reserved, 0);
@@ -203,7 +203,7 @@ fn remove_and_reregister_invalidates_old_authorizations() {
     env.ok(OWNER, "removeAgent", &AGENT);
     env.register(None).unwrap();
     assert_eq!(env.agent().record.generation, 2);
-    assert_eq!(env.fails(OWNER, "approve", &pend.id), Error::StaleGeneration);
+    assert_eq!(env.fails(OWNER, "approve", &ap(pend.id)), Error::StaleGeneration);
     let c = CommitParams { id: appr.id, digest: HashSha2256([1; 32]) };
     assert_eq!(env.fails(COSIGNER, "commitPayment", &c), Error::StaleGeneration);
     assert_eq!(env.agent().spent_today_now, 0);
@@ -215,7 +215,7 @@ fn approval_rechecks_allowlist() {
     env.register(None).unwrap();
     let pend = env.auth(60, PayMode::X402).unwrap();
     env.ok(OWNER, "setAllowlist", &SetAllowlistParams { agent: AGENT, allowlist: vec![] });
-    assert_eq!(env.fails(OWNER, "approve", &pend.id), Error::NotAllowlisted);
+    assert_eq!(env.fails(OWNER, "approve", &ap(pend.id)), Error::NotAllowlisted);
 }
 
 #[test]
@@ -285,4 +285,33 @@ fn events_form_an_audit_trail() {
         purpose_hash: HashSha2256([7; 32]),
     });
     assert_eq!(evs[0].as_ref(), expected.as_slice());
+}
+
+#[test]
+fn approval_records_the_human_proof() {
+    let mut env = setup(false, OWNER);
+    env.register(None).unwrap();
+    let small = env.auth(10, PayMode::X402).unwrap();
+    assert_eq!(env.authorization(small.id).auth.human_proof, None, "auto-approved: no human involved");
+    let big = env.auth(90, PayMode::X402).unwrap();
+    let r = env.ok(OWNER, "approve", &ap(big.id));
+    let a = env.authorization(big.id).auth;
+    assert_eq!(a.status, AuthStatus::Approved);
+    assert_eq!(a.human_proof, Some(HUMAN_PROOF));
+    let evs: Vec<_> = r.events().flat_map(|(_, e)| e.to_vec()).collect();
+    assert_eq!(evs[0].as_ref(), to_bytes(&Event::Approved { id: big.id, human_proof: HUMAN_PROOF }).as_slice());
+}
+
+#[test]
+fn audit_head_can_be_anchored_by_accountable_parties_only() {
+    let mut env = setup(false, OWNER);
+    env.register(None).unwrap();
+    let p = AnchorAuditParams { head: HashSha2256([3; 32]), count: 12 };
+    for who in [OWNER, AGENT, COSIGNER] {
+        let r = env.ok(who, "anchorAudit", &p);
+        let evs: Vec<_> = r.events().flat_map(|(_, e)| e.to_vec()).collect();
+        assert_eq!(evs[0].as_ref(), to_bytes(&Event::AuditAnchored { by: who, head: p.head, count: 12 }).as_slice());
+    }
+    assert_eq!(env.fails(STRANGER, "anchorAudit", &p), Error::NotPermitted);
+    assert_eq!(env.fails(PAYEE, "anchorAudit", &p), Error::NotPermitted);
 }

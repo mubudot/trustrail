@@ -85,6 +85,7 @@ fn authorize(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) 
         day: today,
         commitment: None,
         settlement: None,
+        human_proof: None,
     });
 
     if status == AuthStatus::Pending {
@@ -113,17 +114,18 @@ fn authorize(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) 
     Ok(AuthorizeOutcome { id, status, expires_at })
 }
 
-/// Owner approves a pending authorisation. Escrow payments are executed immediately.
+/// Owner approves a pending authorisation, attaching the anchor hash of the Verification Audit
+/// Record that proves a verified human approved it. Escrow payments are executed immediately.
 #[receive(
     contract = "agent_spend_guard",
     name = "approve",
-    parameter = "u64",
+    parameter = "ApproveParams",
     error = "Error",
     mutable,
     enable_logger
 )]
 fn approve(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) -> ContractResult<()> {
-    let id: u64 = ctx.parameter_cursor().get()?;
+    let ApproveParams { id, human_proof } = ctx.parameter_cursor().get()?;
     let now = ctx.metadata().slot_time();
     let state = host.state();
     ensure_owner(ctx, state)?;
@@ -139,12 +141,13 @@ fn approve(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) ->
 
     let escrow = auth.mode == PayMode::Escrow;
     auth.status = if escrow { AuthStatus::Settled } else { AuthStatus::Approved };
+    auth.human_proof = Some(human_proof);
     let state = host.state_mut();
     if escrow {
         state.escrow_reserved = state.escrow_reserved.saturating_sub(auth.amount);
     }
     let _ = state.auths.insert(id, auth.clone());
-    logger.log(&Event::Approved { id })?;
+    logger.log(&Event::Approved { id, human_proof })?;
     if escrow {
         escrow_pay(host, &auth.payee, auth.amount)?;
         logger.log(&Event::Settled { id, tx_hash: None })?;

@@ -1,0 +1,49 @@
+{
+  "badges": {
+    "buyer": {
+      "holder": "4quNUwSZDXiz2zb6jGQ8ytj6UX3ASqwyoBt4owTc5k9h6mMnMU",
+      "tokenId": "977",
+      "tokenAddress": "JyP9XqAasF5crQaoy7nMw",
+      "mintTx": "0e2534493fbe7315817e692358f0b832612d9b47d8bafd723ae529990a2e868f",
+      "agentUri": "https://trustrail-204-44-110-122.sslip.io/agents/977.json",
+      "cardSha256": "c6a274c3cf71f8f3b16a4d4be148067ce75d85863828c4451ad786637d8d69c4",
+      "setUriTx": "2fd95f53b4da0d238db4553b1ce0d09fefb4cd45ea29441bc3805972bff00f19"
+    },
+    "seller": {
+      "holder": "3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H",
+      "tokenId": "978",
+      "tokenAddress": "JyP9XrG4oGaYgXpdugBc5",
+      "mintTx": "66f17c95d58cf7797c8bf2e046f1873414d18d8d13096af708d952efb1b304a7",
+      "agentUri": "https://trustrail-204-44-110-122.sslip.io/agents/978.json",
+      "cardSha256": "216ac90da1ffd297662382a4306e3f56fe5ad18a98ab82bf066a250c2f2dc145",
+      "setUriTx": "071805c138bf4a35d0aeb84c5f3662c131003062dd9744ff35fac33ee6725cb0"
+    }
+  },
+  "agentRegistry": {
+    "index": 12802,
+    "subindex": 0
+  },
+  "guard": {
+    "moduleRef": "2265603ddca0c5ac38009273dcc5893abe9aea626e8129cb185caf18d1a23ec4",
+    "deployTx": "87c9ace96544f7c1ccc9e9707062a2ca73aa4cd55aac6444af58fbe412d2032c",
+    "address": {
+      "index": "13037",
+      "subindex": "0"
+    },
+    "initTx": "97b048d709410e23f7c1be1366c09a075e7398693672ecf6df1a1f8ca734f07c",
+    "owner": "4quNUwSZDXiz2zb6jGQ8ytj6UX3ASqwyoBt4owTc5k9h6mMnMU",
+    "cosigner": "4p8CXk9yRxQT2w6KTREEB9Au6htSbUMV2yAE6zh4pcM94nshVG",
+    "registerTx": "a30abd837a0d93950fefbfe3bca330bf0dac98c48ed6738881f002904de1d179",
+    "agent": "2ysDtPL5obhzoKQgys9uYqWo9wb4CZ182k5xEGHUVsVpdZm62W",
+    "wallet": "44e2e4v332fXTACRszqVBwJRg2SuhTLAaBQ5iPPcK7N7XH8doo",
+    "policy": {
+      "asset": {
+        "Ccd": []
+      },
+      "per_tx_cap": "5000000",
+      "daily_cap": "12000000",
+      "approval_threshold": "2000000",
+      "auth_ttl_ms": "900000"
+    }
+  }
+}

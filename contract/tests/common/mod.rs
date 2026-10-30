@@ -148,4 +148,8 @@ impl Env {
     pub fn balance(&self, a: AccountAddress) -> Amount { self.chain.account_balance_available(a).unwrap() }
 }
 
+/// Approval parameters with a fixed stand-in for the Verification Audit Record anchor hash.
+pub fn ap(id: u64) -> ApproveParams { ApproveParams { id, human_proof: HUMAN_PROOF } }
+pub const HUMAN_PROOF: HashSha2256 = HashSha2256([0x4a; 32]);
+
 pub fn err_of(e: &ContractInvokeError) -> Option<Error> { e.parse_return_value::<Error>().ok() }

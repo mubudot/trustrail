@@ -1,6 +1,7 @@
 // Wires a complete offline world: owner, agent (2-of-2 account), co-signer, guard contract (mock),
 // facilitator, ledger, a verified seller, an unverified seller and an attacker. Shared by the demo
 // and the tests so both exercise exactly the same setup.
+import { createHash } from 'node:crypto';
 import { AuditLog } from '../audit/log.mjs';
 import { TrustedAgent } from '../agent.mjs';
 import { MockGuardChain } from '../chain/mock-guard.mjs';
@@ -65,11 +66,22 @@ export function createWorld({ startMs = Date.UTC(2026, 11, 1, 9, 0, 0), policy }
   const resolver = new FixtureBadgeResolver({
     BadgeDataSeller: { valid: true, active: true, owner: 'data-seller-owner', agentWallet: ACCOUNTS.dataSeller },
   });
-  const cosigner = new Cosigner({ guard, account: ACCOUNTS.cosigner, keyPair: cosignerKeys, agentAccount: ACCOUNTS.agent, agentPublicKey: agentKeys.publicKey, clock });
+  // Stand-in for Verify-and-Access: proofs "issued" by humanApprove() verify for their own authId only.
+  const humanProofs = new Map();
+  const humanApprove = (authId) => {
+    const proof = createHash('sha256').update(`verified-human-approval:${authId}`).digest('hex');
+    humanProofs.set(String(authId), proof);
+    guard.approve(ACCOUNTS.owner, authId, proof);
+    return proof;
+  };
+  const cosigner = new Cosigner({
+    guard, account: ACCOUNTS.cosigner, keyPair: cosignerKeys, agentAccount: ACCOUNTS.agent, agentPublicKey: agentKeys.publicKey, clock,
+    verifyHumanApproval: (authId, proof) => humanProofs.get(String(authId)) === proof,
+  });
   const audit = new AuditLog({ clock });
   const agent = new TrustedAgent({
     account: ACCOUNTS.agent, agentKey: agentKeys.privateKey, guard, cosigner, resolver, audit, fetchImpl,
     nonceOf: (a) => ledger.account(a).nonce, network: NETWORK, clock,
   });
-  return { agent, guard, ledger, cosigner, audit, facilitator, fetchImpl, agentKeys, cosignerKeys, clock, advance };
+  return { agent, guard, ledger, cosigner, audit, facilitator, fetchImpl, agentKeys, cosignerKeys, clock, advance, humanApprove };
 }
