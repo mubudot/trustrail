@@ -49,3 +49,33 @@ test('guard parameters serialise through the deployed module schema', () => {
   assert.equal(g.param('anchorAudit', { head: 'bb'.repeat(32), count: 2n }).toString(), `${'bb'.repeat(32)}0200000000000000`);
   assert.throws(() => g.param('approve', { id: 3n }));
 });
+
+test('approval context must match the anchored request exactly (nonce, resource, block hash)', async () => {
+  const { checkContext } = await import('../src/human-approval.mjs');
+  const { BlockHash, TransactionHash } = await import('@concordium/web-sdk');
+  const bh = BlockHash.fromHexString('ab'.repeat(32));
+  const request = {
+    transactionRef: TransactionHash.fromHexString('cd'.repeat(32)),
+    context: { given: [{ label: 'Nonce', context: new Uint8Array([1, 2]) }, { label: 'ResourceID', context: 'r:1' }], requested: ['BlockHash'] },
+  };
+  const pres = (over = {}) => ({ presentationContext: { given: [{ label: 'Nonce', context: new Uint8Array([1, 2]) }, { label: 'ResourceID', context: 'r:1' }], requested: [{ label: 'BlockHash', context: bh }], ...over } });
+  const grpc = { getBlockItemStatus: async () => ({ status: 'finalized', outcome: { blockHash: bh } }) };
+  await checkContext(grpc, request, pres());
+  await assert.rejects(checkContext(grpc, request, pres({ given: [{ label: 'Nonce', context: new Uint8Array([9]) }, { label: 'ResourceID', context: 'r:1' }] })), /approval_context_mismatch: Nonce/);
+  await assert.rejects(checkContext(grpc, request, pres({ given: [{ label: 'Nonce', context: new Uint8Array([1, 2]) }, { label: 'ResourceID', context: 'r:2' }] })), /ResourceID/);
+  await assert.rejects(checkContext(grpc, request, pres({ requested: [{ label: 'BlockHash', context: BlockHash.fromHexString('ef'.repeat(32)) }] })), /BlockHash/);
+  await assert.rejects(checkContext({ getBlockItemStatus: async () => ({ status: 'committed' }) }, request, pres()), /not_finalized/);
+});
+
+test('requested claims must be the account-based age check from a trusted IdP', async () => {
+  const { checkRequestedClaims } = await import('../src/human-approval.mjs');
+  const { getPastDate } = await import('@concordium/web-sdk');
+  const good = { subjectClaims: [{ type: 'identity', source: ['accountCredential'], issuers: ['did:ccd:testnet:idp:0'], statements: [{ type: 'AttributeInRange', attributeTag: 'dob', lower: '18000101', upper: getPastDate(18, 1) }] }] };
+  checkRequestedClaims(good);
+  const c = structuredClone(good); c.subjectClaims[0].statements = [];
+  assert.throws(() => checkRequestedClaims(c), /approval_wrong_claims/);
+  const c2 = structuredClone(good); c2.subjectClaims[0].issuers = ['did:ccd:testnet:idp:9'];
+  assert.throws(() => checkRequestedClaims(c2), /untrusted_issuer/);
+  const c3 = structuredClone(good); c3.subjectClaims[0].statements[0].upper = getPastDate(10, 1);
+  assert.throws(() => checkRequestedClaims(c3), /approval_wrong_claims/);
+});

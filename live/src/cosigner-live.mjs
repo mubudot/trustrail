@@ -7,10 +7,15 @@
 import { purposeHash } from '../../agent/src/util/canonical.mjs';
 import { fromJSON, signingDigest } from './x402-buyer.mjs';
 import { signDigestWithKey, verifyDigestWithKey } from './keys.mjs';
-import { checkApproval as checkApprovalOnChain, approvalResourceId } from './human-approval.mjs';
+import { AccountAddress } from '@concordium/web-sdk';
+import { checkApproval as checkApprovalOnChain, approvalResourceId, approvalContextString } from './human-approval.mjs';
 import { enumTag, unOpt } from './guard-client.mjs';
 
 export const MAX_EXPIRY_S = 600;
+/** Execution energy of a simple CCD transfer (what @x402/concordium and our buyer set). */
+export const TRANSFER_ENERGY = 300n;
+
+const same = (a, b) => AccountAddress.isAlias(AccountAddress.fromBase58(a), AccountAddress.fromBase58(b));
 
 export class CosignRefused extends Error {
   constructor(reason) { super(`co-signer refused: ${reason}`); this.reason = reason; }
@@ -54,7 +59,7 @@ export class LiveCosigner {
       const ap = await this.approvals(authId);
       if (!ap) no('human_approval_record_unavailable');
       try {
-        await this.checkApproval({ grpc: this.guard.grpc, recordJSON: ap.record, anchorTx: ap.anchorTx, ownerAddress: this.owner, resourceId: approvalResourceId(this.guard.address, authId), expectedAnchorHash: humanProof });
+        await this.checkApproval({ grpc: this.guard.grpc, recordJSON: ap.record, anchorTx: ap.anchorTx, ownerAddress: this.owner, resourceId: approvalResourceId(this.guard.address, authId), contextString: approvalContextString(a), expectedAnchorHash: humanProof, trustedVerifiers: [this.account.address] });
       } catch (e) { no(e.message.split(':')[0].replace(/\s+/g, '_')); }
     }
 
@@ -71,7 +76,19 @@ export class LiveCosigner {
     if (tx.payload.amount.microCcdAmount !== BigInt(a.amount)) no('tx_amount_mismatch');
     if (enumTag(a.asset) !== 'Ccd') no('tx_asset_mismatch');
     const sponsor = h.sponsor.account.address;
-    if (sponsor === payTo || sponsor === h.sender.address) no('tx_sponsor_is_party');
+    // Aliases are the same account: a wallet alias as sponsor would let these signatures also pay
+    // the fees from the wallet. The sponsor must be exactly the facilitator named in the offer
+    // (bound by the purpose hash) and must not be any alias of the wallet or the payee.
+    if (same(sponsor, payTo) || same(sponsor, h.sender.address)) no('tx_sponsor_is_party');
+    if (sponsor !== requirements?.extra?.feePayer) no('tx_sponsor_not_offer_fee_payer');
+    if (Number(h.sponsor.numSignatures ?? 1) !== 1) no('tx_sponsor_signatures');
+    if (BigInt(h.executionEnergyAmount?.value ?? h.executionEnergyAmount) !== TRANSFER_ENERGY) no('tx_energy');
+    // A transfer with a stale or future nonce can never settle, but its commitment would book the
+    // budget for good: only commit to the wallet's next nonce.
+    if (this.guard.grpc?.getNextAccountNonce) {
+      const { nonce } = await this.guard.grpc.getNextAccountNonce(AccountAddress.fromBase58(rec.wallet));
+      if (BigInt(h.nonce.value ?? h.nonce) !== BigInt(nonce.value ?? nonce)) no('tx_nonce_not_next');
+    }
     const expS = BigInt(h.expiry.expiryEpochSeconds ?? h.expiry);
     const nowS = now / 1000n;
     if (expS <= nowS || expS > nowS + BigInt(MAX_EXPIRY_S)) no('tx_expiry_window');

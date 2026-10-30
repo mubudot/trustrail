@@ -25,6 +25,7 @@ export class LiveAgent {
   constructor({ grpc, guard, agent, walletKey0, cosigner, resolver, audit, network, fetchImpl = fetch, requireVerifiedPayee = true }) {
     Object.assign(this, { grpc, guard, agent, walletKey0, cosigner, resolver, audit, network, fetchImpl, requireVerifiedPayee });
     this.pending = new Map();
+    this.walletLock = Promise.resolve(); // one payment per wallet at a time (nonce allocation -> settlement)
   }
 
   #refuse(stage, reason, extra = {}) {
@@ -80,7 +81,14 @@ export class LiveAgent {
     return this.pay(BigInt(authId), p.url, p.requirements);
   }
 
-  async pay(authId, url, requirements) {
+  /** Serialises payments from the wallet: build (nonce) -> co-sign -> settle cannot interleave. */
+  pay(authId, url, requirements) {
+    const run = this.walletLock.then(() => this.#payNow(authId, url, requirements));
+    this.walletLock = run.catch(() => {});
+    return run;
+  }
+
+  async #payNow(authId, url, requirements) {
     const view = await this.guard.authorization(authId);
     if (!view) return this.#refuse('pay', 'unknown_authorization', { authId });
     const me = await this.guard.agent(this.agent.address);
@@ -105,12 +113,22 @@ export class LiveAgent {
       return { status: 'settlement_unknown', authId };
     }
     if (res.status !== 200 || !res.settlement?.success) {
-      this.audit.append('settlement_unknown', { authId, httpStatus: res.status, error: res.settlement?.errorReason ?? res.body?.error ?? 'settlement_failed' });
-      return { status: 'settlement_unknown', authId, reason: res.settlement?.errorReason ?? res.body?.error };
+      // Keep any transaction hash the facilitator reported: it is the reconciliation key.
+      const txHash = res.settlement?.transaction || null;
+      this.audit.append('settlement_unknown', { authId, txHash, httpStatus: res.status, error: res.settlement?.errorReason ?? res.body?.error ?? 'settlement_failed' });
+      return { status: 'settlement_unknown', authId, txHash, reason: res.settlement?.errorReason ?? res.body?.error };
     }
     const txHash = res.settlement.transaction;
-    const rec = await this.guard.send('recordSettlement', { id: BigInt(authId), tx_hash: txHash }, { sender: this.agent.address, signer: this.agent.signer });
-    this.audit.append('settled', { authId, txHash, recordTx: rec.txHash, amount: BigInt(requirements.amount), payTo: requirements.payTo });
+    // Evidence first: the payment is final on chain whether or not the guard record succeeds.
+    this.audit.append('paid', { authId, txHash, amount: BigInt(requirements.amount), payTo: requirements.payTo });
+    let rec;
+    try {
+      rec = await this.guard.send('recordSettlement', { id: BigInt(authId), tx_hash: txHash }, { sender: this.agent.address, signer: this.agent.signer });
+    } catch (e) {
+      this.audit.append('settlement_record_failed', { authId, txHash, error: String(e?.code ?? e?.message ?? e) });
+      return { status: 'paid_unrecorded', authId, txHash, commitTx: this.cosigner.lastCommitTx, data: res.body };
+    }
+    this.audit.append('settled', { authId, txHash, recordTx: rec.txHash });
     return { status: 'paid', authId, txHash, recordTx: rec.txHash, commitTx: this.cosigner.lastCommitTx, data: res.body };
   }
 }

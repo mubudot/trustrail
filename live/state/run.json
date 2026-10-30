@@ -116,11 +116,51 @@
       "head": "293be4ae1a3006a8f298d67e152f6ee03ab99282998efb98d4a3101f3c145b8a",
       "count": 27,
       "txHash": "edd852fbc8e2f8c12e4a80ed2c6d0bc7cb61f4b299520f0b70c42823385418a1"
+    },
+    {
+      "step": "small",
+      "at": "2026-10-30T19:21:52.094Z",
+      "status": "paid",
+      "authId": "4",
+      "txHash": "86b08eae4720542d0b43eefc527cddaa4a8255163d2770e40c7aea08e122c02b",
+      "recordTx": "66cb70700c53f285fb8fbd6d53de74f317e26f8676634f2de17e1e30f8e94032",
+      "commitTx": "7023c3cea111982bfbd44e061f91e120a3ae038883333c3cd7d5dfbb787e5bb3",
+      "data": {
+        "tokyo": "18C, clear"
+      }
+    },
+    {
+      "step": "big-request",
+      "at": "2026-10-30T19:22:07.989Z",
+      "status": "pending_approval",
+      "authId": "5",
+      "txHash": "b7783b8bc943f4611605da97ed2efd17e935d2616329b370ff81280df2d41971"
+    },
+    {
+      "step": "big-approve",
+      "at": "2026-10-30T19:22:32.082Z",
+      "authId": "5",
+      "requestTx": "21894906c9faa606b135a60759654e27863619f6610c9b0644849493f4a24dfa",
+      "recordAnchorTx": "42c74d25bcb66495e0689774479a2085bf171bc1f5a6432720890e2e2d7bb095",
+      "anchorHash": "39c92414fb200323f2c9944c8ce32b2c8294cdae4df9427bff6581fbddf66131",
+      "approveTx": "6399605db510b3eedb06a4e55363c0bfff2ebcc3735d6724cdca030d75a49800"
+    },
+    {
+      "step": "big-pay",
+      "at": "2026-10-30T19:23:02.102Z",
+      "status": "paid",
+      "authId": "5",
+      "txHash": "9c8b101adaa32ec4cf6e5c5b3c40384e2e4dcf17c3eff4bcf377b4f9306e3a01",
+      "recordTx": "18194fb5c5d454d8ed5933fd39fb757c8e4be45353b4e2dfe3ffcccb69ae8040",
+      "commitTx": "c0251ba11d19ee26fe11c929189957e1747337f5a83cef18d4680dc601a113a2",
+      "data": {
+        "rows": 1000
+      }
     }
   ],
   "pending": {
     "big-request": {
-      "authId": "1",
+      "authId": "5",
       "url": "http://127.0.0.1:4402/dataset",
       "requirements": {
         "scheme": "exact",

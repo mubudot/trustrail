@@ -18,7 +18,7 @@ import {
 } from '@concordium/web-sdk/wasm';
 import {
   AccountAddress, CredentialRegistrationId, IdentityProviderDID, TransactionHash,
-  createAccountCommitmentInputWithHdWallet,
+  createAccountCommitmentInputWithHdWallet, getPastDate,
 } from '@concordium/web-sdk';
 
 export const NETWORK = 'Testnet';
@@ -64,10 +64,35 @@ export async function proveApproval({ grpc, request, identity, credNumber, owner
   return VerifiablePresentationV1.createFromAnchor(grpc, request, [subject], [input], []);
 }
 
+const ctxValue = (c) => (c instanceof Uint8Array ? Buffer.from(c).toString('hex') : c?.buffer instanceof Uint8Array ? Buffer.from(c.buffer).toString('hex') : String(c));
+
+/**
+ * The presentation must answer exactly this anchored request: every given context item (nonce,
+ * connection id, ResourceID, context string) equal, and the requested BlockHash equal to the block
+ * the request anchor was finalized in. (Done here explicitly and awaited.)
+ */
+export async function checkContext(grpc, request, presentation) {
+  const rc = request.context;
+  const pc = presentation.presentationContext;
+  if (rc.given.length !== pc.given.length || rc.requested.length !== pc.requested.length) throw new Error('approval_context_mismatch');
+  for (const g of rc.given) {
+    if (!pc.given.some((p) => p.label === g.label && ctxValue(p.context) === ctxValue(g.context))) throw new Error(`approval_context_mismatch: ${g.label}`);
+  }
+  if (!rc.requested.every((label) => pc.requested.some((p) => p.label === label))) throw new Error('approval_context_mismatch');
+  if (!rc.requested.includes('BlockHash')) throw new Error('approval_context_mismatch: BlockHash not requested');
+  const anchor = await grpc.getBlockItemStatus(request.transactionRef);
+  if (anchor.status !== 'finalized') throw new Error('approval_request_not_finalized');
+  const bh = pc.requested.find((p) => p.label === 'BlockHash');
+  if (ctxValue(bh.context) !== ctxValue(anchor.outcome.blockHash)) throw new Error('approval_context_mismatch: BlockHash');
+}
+
 /** Checks shared by the verifier and the co-signer. Throws with a stable reason. */
-async function checkBinding(grpc, presentation, request, { ownerAddress, resourceId }) {
+async function checkBinding(grpc, presentation, request, { ownerAddress, resourceId, contextString }) {
   const given = Object.fromEntries(request.context.given.map((g) => [g.label, g.context]));
   if (given.ResourceID !== resourceId) throw new Error('approval_wrong_resource');
+  if (contextString !== undefined && given.ContextString !== contextString) throw new Error('approval_wrong_payment_details');
+  checkRequestedClaims(request);
+  await checkContext(grpc, request, presentation);
   const v = await VerifiablePresentationV1.verifyWithNode(presentation, grpc, NETWORK);
   if (v.type !== 'success') throw new Error(`approval_proof_invalid: ${v.error?.message}`);
   if (!v.result.credentialsStatus.every((s) => s === 0)) throw new Error('approval_credential_not_active');
@@ -78,8 +103,8 @@ async function checkBinding(grpc, presentation, request, { ownerAddress, resourc
 }
 
 /** Verifier: check, build the audit record, anchor it. Returns what the owner puts on chain. */
-export async function recordApproval({ grpc, verifier, request, presentation, ownerAddress, resourceId }) {
-  await checkBinding(grpc, presentation, request, { ownerAddress, resourceId });
+export async function recordApproval({ grpc, verifier, request, presentation, ownerAddress, resourceId, contextString }) {
+  await checkBinding(grpc, presentation, request, { ownerAddress, resourceId, contextString });
   const r = await VerificationAuditRecordV1.createAndAnchor(resourceId, request, presentation, grpc,
     { metadata: { sender: AccountAddress.fromBase58(verifier.address), signer: verifier.signer } }, { network: NETWORK });
   if (r.type !== 'success') throw new Error(`approval_record_failed: ${r.error?.message}`);
@@ -92,14 +117,34 @@ export async function recordApproval({ grpc, verifier, request, presentation, ow
   };
 }
 
-/** Co-signer / auditor: everything re-derived from the record JSON + chain. */
-export async function checkApproval({ grpc, recordJSON, anchorTx, ownerAddress, resourceId, expectedAnchorHash }) {
+/** The request must ask exactly for what we require: one account-based age >= MIN_AGE claim from a trusted IdP. */
+export function checkRequestedClaims(request) {
+  const c = request.subjectClaims;
+  if (c.length !== 1 || c[0].type !== 'identity' || !c[0].source.includes('accountCredential')) throw new Error('approval_wrong_claims');
+  const issuers = c[0].issuers.map((d) => (typeof d === 'string' ? d : d.toJSON()));
+  if (!issuers.length || !issuers.every((d) => TRUSTED_IDPS.some((i) => d === new IdentityProviderDID(NETWORK, i).toJSON()))) throw new Error('approval_untrusted_issuer');
+  const dob = c[0].statements.find((x) => x.attributeTag === 'dob' && x.type === 'AttributeInRange');
+  // addMinimumAge(n) asks for dob < (today - n years + 1 day); any request at least that strict is fine.
+  if (!dob || !(String(dob.upper) <= getPastDate(MIN_AGE, 1))) throw new Error('approval_wrong_claims');
+}
+
+/**
+ * Co-signer / auditor: everything re-derived from the record JSON + chain.
+ * `trustedVerifiers`: accounts allowed to have anchored the request (its fresh nonce + context).
+ */
+export async function checkApproval({ grpc, recordJSON, anchorTx, ownerAddress, resourceId, contextString, expectedAnchorHash, trustedVerifiers }) {
   const record = VerificationAuditRecordV1.fromJSON(recordJSON);
   const hash = Buffer.from(VerificationAuditRecordV1.computeAnchorHash(record)).toString('hex');
   if (hash !== expectedAnchorHash) throw new Error('approval_hash_mismatch');
   if (record.id !== resourceId) throw new Error('approval_wrong_resource');
+  await checkBinding(grpc, record.presentation, record.request, { ownerAddress, resourceId, contextString });
   await VerificationAuditRecordV1.verifyAnchor(record, TransactionHash.fromHexString(anchorTx), grpc);
-  await VerificationRequestV1.verifyAnchor(record.request, grpc);
-  await checkBinding(grpc, record.presentation, record.request, { ownerAddress, resourceId });
+  const reqAnchor = await VerificationRequestV1.verifyAnchor(record.request, grpc);
+  const reqSender = String(reqAnchor.summary.sender?.address ?? reqAnchor.summary.sender);
+  if (trustedVerifiers && !trustedVerifiers.includes(reqSender)) throw new Error('approval_request_not_from_verifier');
+  // Full SDK check: proof valid against chain AND the presentation answers exactly this request
+  // (same context: nonce, ResourceID, anchored block; claims satisfy the requested statements).
+  const full = await VerificationAuditRecordV1.createChecked(record.id, record.request, record.presentation, grpc, NETWORK);
+  if (full.type !== 'success') throw new Error(`approval_proof_invalid: ${full.error?.message}`);
   return true;
 }

@@ -1,0 +1,121 @@
+{
+  "record": {
+    "request": {
+      "type": "ConcordiumVerificationRequestV1",
+      "context": {
+        "type": "ConcordiumUnfilledContextInformationV1",
+        "given": [
+          {
+            "label": "Nonce",
+            "context": "cd27168f9c3f246df5bfeb7a4c36bf363743003545a561beaf6a4fcb8b8afe62"
+          },
+          {
+            "label": "ConnectionID",
+            "context": "trustrail-approval"
+          },
+          {
+            "label": "ResourceID",
+            "context": "trustrail:ccd:testnet:13037:0:auth:5"
+          },
+          {
+            "label": "ContextString",
+            "context": "approve 4000000 microCCD to 3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H for purpose dab795778d86864c06816f07542810c2732ddbc27a39eed5b1570b1635bfcdb9"
+          }
+        ],
+        "requested": [
+          "BlockHash"
+        ]
+      },
+      "subjectClaims": [
+        {
+          "type": "identity",
+          "source": [
+            "accountCredential"
+          ],
+          "statements": [
+            {
+              "type": "AttributeInRange",
+              "attributeTag": "dob",
+              "lower": "18000101",
+              "upper": "20081031"
+            }
+          ],
+          "issuers": [
+            "did:ccd:testnet:idp:0"
+          ]
+        }
+      ],
+      "transactionRef": "21894906c9faa606b135a60759654e27863619f6610c9b0644849493f4a24dfa"
+    },
+    "presentation": {
+      "type": [
+        "VerifiablePresentation",
+        "ConcordiumVerifiablePresentationV1"
+      ],
+      "presentationContext": {
+        "type": "ConcordiumContextInformationV1",
+        "given": [
+          {
+            "label": "Nonce",
+            "context": "cd27168f9c3f246df5bfeb7a4c36bf363743003545a561beaf6a4fcb8b8afe62"
+          },
+          {
+            "label": "ConnectionID",
+            "context": "trustrail-approval"
+          },
+          {
+            "label": "ResourceID",
+            "context": "trustrail:ccd:testnet:13037:0:auth:5"
+          },
+          {
+            "label": "ContextString",
+            "context": "approve 4000000 microCCD to 3joCzai3rDHSPbqH6FnsDs4ZwCiVcErjdpRvdEavojrzu2Pn7H for purpose dab795778d86864c06816f07542810c2732ddbc27a39eed5b1570b1635bfcdb9"
+          }
+        ],
+        "requested": [
+          {
+            "label": "BlockHash",
+            "context": "93951086a316d2835b0402e412d01e424210a10dc802b03db00f77052f1884d8"
+          }
+        ]
+      },
+      "verifiableCredential": [
+        {
+          "type": [
+            "VerifiableCredential",
+            "ConcordiumVerifiableCredentialV1",
+            "ConcordiumAccountBasedCredential"
+          ],
+          "credentialSubject": {
+            "id": "did:ccd:testnet:cred:86031d35c4586f6a9427b948cccee7f1999f06b63269c78d321d1f2d6176b2c8cfdf7375d1ce5c735d4e380bec4b68d8",
+            "statement": [
+              {
+                "type": "AttributeInRange",
+                "attributeTag": "dob",
+                "lower": "18000101",
+                "upper": "20081031"
+              }
+            ]
+          },
+          "issuer": "did:ccd:testnet:idp:0",
+          "proof": {
+            "created": "2026-10-30T19:22:17.087Z",
+            "proofValue": "000000000000000102aa582892028a1477eeeea52b296743f95d883e022d827ac860297fe04ff293b352e44dcdf5a3e16af671699ce4954bdf96006ad31d34e52aa14adb9a44efa306ed0a310c5db6ab0dd555a1e4616354546be12d918a3fd2ad2d5f5693da0825f281ec6c45dedfd143add6e0732f03b98a4c6ae911446a01a774b82fdf1102f0ac722087356de325ff27e9ab9d9b7baccea7de428c330cec808f04cd06280f4540facf71f1f36f11adb0d779fcf7a312f3f95662692ebb8d678f9819a12b8a8e0323d2f0e1e0237bf02c072ed67ba34753203af4fa28a9d34f1efdf46d0ec8c62653730b831d08facff9e86f383cf373a918ee22ca95be4b6b99a27acf6eefa4c52a081dad5426bc90754b7823c4f55621f45cc6436e2ed4ed35fd42d8fdbefbe2000000078907b0af2ebde26eb4af2545507024f0296121fdbc6977646c665fa5b3b70fdbe2a1520b16d0ef1152489fa38e060791950facdd06b83ef02ea54f83ec3a9e4559ea3bad08795d63f0ec345ec4a1cd3e067a66980ac1de944aff267ea97a6f9e8e44cece34fb35023292c3f6ed0bfb10280d41365bb287e2ec0067eba518ecd818ee85d86c6d58d3ae33f1b7200bd3f48bce239184721c7c5ac14744259045c48d1d84f84640dd6138a44d796ed03146f079cae78c07a605b09c8b4856ac32d086eba4f413678c6af5dd1a4d35a53fa4c66c6922c2cd66f373c36f6d03153fe35cccfc63633ac36d05504ecd6c7f2d79b2f1a6e2e2c619e3c8d325676a037290d49ccfdbfda1eeedb8cdfc7380d7ed1f00039bd63f1f0b78b94a8124ca2ef8f3b0f64e41d3b3e5c478a456657270f8ea0c62bb3db25f97c18bda2bcd37cbc9aed1796727a19f5f81f5cd65f2b3a3cb658ee1a27afa70918df7778fd81fb2e3e8afe2b9497846e23256bcb51a2ef6d3e84bc73b5d9a1198245f1047a3afb4ca3b80c028e4d20daec3430ca9dcacb6452f85a1956de5e5630de6eecc068a9ce96162676b661fd1526c7b4f801912ed2a5987746248e3257dd3e400c4f3a327fe4bffb28cb978ba5833bc5fcdfb40d8f052943aa34c973e2abd28727bbe3cb70cedb7cd61723b0c044c1bb4622a86a271783111afe7b95ffecb9a3664a2f5ddf84126bb857ea161403d3e2d0acbc3e7bf90ab00e79d60978f51794bd660763491a4f51f27cd68cfd5836ca5a7baac9f0765bea1a5731ff909862f21f14405575e998c3d5e866ee138bccf9e874a509c31fe28ad8c4e3789b07ddb538860aa69d2c0748b4cceb8900b1b14f93d16a4dab92c994abf95b18d97a5ec54012e2bd66df6adc563d674ebb0b7ecfe216fcf51eac467d55979318dc7b1c5e33b9d1b4c50e02090673b025acf0b54fc1c957a4137a65976d3259213e68f8bc7ed7cc6ecffcf3fb5b98848f528b830c272acc2175f6cbf4a97434428e2558b23cfe123d96ae7",
+            "type": "ConcordiumZKProofV4"
+          }
+        }
+      ],
+      "proof": {
+        "created": "2026-10-30T19:22:17.087Z",
+        "proofValue": "",
+        "type": "ConcordiumWeakLinkingProofV1"
+      }
+    },
+    "id": "trustrail:ccd:testnet:13037:0:auth:5",
+    "version": 1,
+    "type": "ConcordiumVerificationAuditRecord"
+  },
+  "anchorTx": "42c74d25bcb66495e0689774479a2085bf171bc1f5a6432720890e2e2d7bb095",
+  "requestTx": "21894906c9faa606b135a60759654e27863619f6610c9b0644849493f4a24dfa",
+  "anchorHash": "39c92414fb200323f2c9944c8ce32b2c8294cdae4df9427bff6581fbddf66131"
+}

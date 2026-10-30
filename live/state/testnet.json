@@ -44,6 +44,10 @@
       "daily_cap": "12000000",
       "approval_threshold": "2000000",
       "auth_ttl_ms": "900000"
+    },
+    "walletPublicKeys": {
+      "agentKey0": "c48fdb8c573d5df11dda57d352c47f7bbe0392e755fec77a1156eade7e66e7b8",
+      "cosignerKey1": "ed5e6ec97c6b2d73126b4938d7004d87583c68cb0d2f533ff6939a53a8989cf9"
     }
   }
 }

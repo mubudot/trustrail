@@ -93,3 +93,30 @@ test('small auto-approved payment needs no human proof', async () => {
   const sig = await cos.cosign({ authId: 0n, signableJSON: toJSON(tx), resourceUrl: URL_, requirements: requirements() });
   assert.match(sig, /^[0-9a-f]{128}$/);
 });
+
+test('refuses a wallet alias as sponsor, a sponsor other than the offer fee payer, odd energy, stale nonce', async () => {
+  const { AccountAddress, SequenceNumber } = await import('@concordium/web-sdk');
+  const mk = async (over = {}) => {
+    const s = await setup();
+    const req = { ...requirements(), extra: { ...requirements().extra, ...over.extra } };
+    let tx = await buildTransfer(over.grpc ?? fakeGrpc, { sender: A.wallet, requirements: req });
+    tx = signAsKey(tx, 0, s.k.agent.privateKey);
+    return { ...s, tx, req };
+  };
+  // sponsor = an alias of the wallet (same account, different address string)
+  const alias = AccountAddress.getAlias(AccountAddress.fromBase58(A.wallet), 7).address;
+  const s1 = await mk({ extra: { feePayer: alias } });
+  assert.equal(await refusal(s1.cos.cosign({ authId: 1n, signableJSON: toJSON(s1.tx), resourceUrl: URL_, requirements: requirements() })), 'tx_sponsor_is_party');
+  // sponsor is a third account but not the facilitator named in the (purpose-bound) offer
+  const s2 = await mk({ extra: { feePayer: A.owner } });
+  assert.equal(await refusal(s2.cos.cosign({ authId: 1n, signableJSON: toJSON(s2.tx), resourceUrl: URL_, requirements: requirements() })), 'tx_sponsor_not_offer_fee_payer');
+  // execution energy changed
+  const s3 = await mk();
+  const j3 = toJSON(s3.tx); j3.header.executionEnergyAmount = 0;
+  const t3 = signAsKey(fromJSON({ ...j3, signatures: { sender: { 0: {} } } }), 0, s3.k.agent.privateKey);
+  assert.equal(await refusal(s3.cos.cosign({ authId: 1n, signableJSON: toJSON(t3), resourceUrl: URL_, requirements: requirements() })), 'tx_energy');
+  // nonce is not the wallet's next nonce
+  const s4 = await mk();
+  s4.guard.grpc = { getNextAccountNonce: async () => ({ nonce: SequenceNumber.create(8n) }) };
+  assert.equal(await refusal(s4.cos.cosign({ authId: 1n, signableJSON: toJSON(s4.tx), resourceUrl: URL_, requirements: requirements() })), 'tx_nonce_not_next');
+});

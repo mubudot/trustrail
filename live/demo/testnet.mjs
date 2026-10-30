@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createLiveWorld, STATE_DIR, approvalFile, loadApproval } from '../src/world.mjs';
-import { requestApproval, proveApproval, recordApproval, approvalResourceId } from '../src/human-approval.mjs';
+import { requestApproval, proveApproval, recordApproval, approvalResourceId, approvalContextString } from '../src/human-approval.mjs';
 import { readSecret } from '../src/secrets.mjs';
 import { roleSigner } from '../src/signers.mjs';
 import { selectRequirements, getPaymentRequired } from '../src/x402-buyer.mjs';
@@ -45,7 +45,7 @@ try {
       const view = await w.guard.authorization(authId);
       const request = await requestApproval({ grpc: w.grpc, verifier, guard: w.guard.address, authId, auth: view.auth });
       const presentation = await proveApproval({ grpc: w.grpc, request, identity: readSecret('identity-owner'), credNumber: w.acc.owner.credNumber, ownerAddress: w.acc.owner.address });
-      rec = await recordApproval({ grpc: w.grpc, verifier, request, presentation, ownerAddress: w.acc.owner.address, resourceId: approvalResourceId(w.guard.address, authId) });
+      rec = await recordApproval({ grpc: w.grpc, verifier, request, presentation, ownerAddress: w.acc.owner.address, resourceId: approvalResourceId(w.guard.address, authId), contextString: approvalContextString(view.auth) });
       fs.writeFileSync(approvalFile(authId), `${JSON.stringify({ record: rec.record, anchorTx: rec.anchorTx, requestTx: rec.requestTx, anchorHash: rec.anchorHash }, big, 2)}\n`);
     }
     const ap = await w.guard.send('approve', { id: BigInt(authId), human_proof: rec.anchorHash }, ownerSide);
