@@ -156,6 +156,13 @@
       "data": {
         "rows": 1000
       }
+    },
+    {
+      "step": "anchor",
+      "at": "2026-10-30T19:31:40.117Z",
+      "head": "e72a5a35201baf1c77e59e74452dddf9b5e101286f108421b00df60f821579a4",
+      "count": 40,
+      "txHash": "38d93421c1ca3ee7fcf5ffdc7ee3ba5b7ff2065c1adaa2595bac84605fb7bb9f"
     }
   ],
   "pending": {
