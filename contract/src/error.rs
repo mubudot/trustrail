@@ -33,6 +33,8 @@ pub enum Error {
     TransferFailed,         // -27
     Overflow,               // -28
     ContractSender,         // -29
+    DuplicateSettlement,    // -30
+    InvalidWallet,          // -31
 }
 
 impl From<LogError> for Error {

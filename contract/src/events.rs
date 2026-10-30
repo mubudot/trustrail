@@ -6,7 +6,7 @@ use crate::*;
 #[concordium(repr(u8))]
 pub enum Event {
     #[concordium(tag = 1)]
-    AgentRegistered { agent: AccountAddress, generation: u64, badge: Option<BadgeRef> },
+    AgentRegistered { agent: AccountAddress, wallet: AccountAddress, generation: u64, badge: Option<BadgeRef> },
     #[concordium(tag = 2)]
     AgentRemoved { agent: AccountAddress, generation: u64 },
     #[concordium(tag = 3)]
@@ -37,5 +37,7 @@ pub enum Event {
     BadgeLost { agent: AccountAddress },
     #[concordium(tag = 16)]
     CosignerSet { cosigner: Option<AccountAddress> },
+    #[concordium(tag = 17)]
+    PaymentCommitted { id: u64, digest: HashSha2256 },
 }
 

@@ -51,6 +51,9 @@ pub struct BadgeRef {
 #[derive(Serialize, SchemaType, Clone, PartialEq, Eq, Debug)]
 pub struct AgentRecord {
     pub badge:       Option<BadgeRef>,
+    /// The agent's paying account (2-of-2: agent key + co-signer key). The agent account itself
+    /// (the map key) only calls the guard; it never holds the budget. Matches CIS-8004 `agentWallet`.
+    pub wallet:      AccountAddress,
     pub policy:      SpendPolicy,
     pub allowlist:   Vec<AccountAddress>,
     pub paused:      bool,
@@ -67,6 +70,9 @@ pub struct AgentRecord {
 pub enum AuthStatus {
     Pending,
     Approved,
+    /// The co-signer committed to exactly one transfer (its signing digest) and may now sign it.
+    /// From here the budget is never released: the payment may already be on chain.
+    Committed,
     Settled,
     Rejected,
     Cancelled,
@@ -87,6 +93,8 @@ pub struct Authorization {
     pub created_at:   Timestamp,
     pub expires_at:   Timestamp,
     pub day:          u64,
+    /// Signing digest of the one transfer the co-signer will sign — set by `commitPayment`.
+    pub commitment:   Option<HashSha2256>,
     /// Settlement transaction hash (x402) — set by `recordSettlement`.
     pub settlement:   Option<HashSha2256>,
 }
@@ -101,6 +109,8 @@ pub struct State<S = StateApi> {
     pub(crate) agents:          StateMap<AccountAddress, AgentRecord, S>,
     pub(crate) generations:     StateMap<AccountAddress, u64, S>,
     pub(crate) auths:           StateMap<u64, Authorization, S>,
+    /// Settlement tx hash -> authorisation id (a tx can settle only one authorisation).
+    pub(crate) settled_txs:     StateMap<HashSha2256, u64, S>,
     pub(crate) next_auth_id:    u64,
     /// CCD reserved by pending escrow authorisations (not withdrawable).
     pub(crate) escrow_reserved: u64,
@@ -116,6 +126,7 @@ pub struct InitParams {
 #[derive(Serialize, SchemaType)]
 pub struct RegisterAgentParams {
     pub agent:     AccountAddress,
+    pub wallet:    AccountAddress,
     pub badge:     Option<BadgeRef>,
     pub policy:    SpendPolicy,
     pub allowlist: Vec<AccountAddress>,
@@ -159,6 +170,13 @@ pub struct AuthorizeOutcome {
 pub struct PreviewParams {
     pub agent:   AccountAddress,
     pub request: AuthorizeParams,
+}
+
+#[derive(Serialize, SchemaType)]
+pub struct CommitParams {
+    pub id:     u64,
+    /// Signing digest of the sponsored transfer the co-signer is about to sign.
+    pub digest: HashSha2256,
 }
 
 #[derive(Serialize, SchemaType)]

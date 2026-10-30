@@ -83,6 +83,7 @@ fn authorize(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) 
         created_at: now,
         expires_at,
         day: today,
+        commitment: None,
         settlement: None,
     });
 
@@ -188,7 +189,10 @@ fn cancel(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) -> 
     let id: u64 = ctx.parameter_cursor().get()?;
     let by = sender_account(ctx)?;
     let mut auth = get_auth(host.state(), id)?;
-    ensure!(by == host.state().owner || by == auth.agent, Error::NotPermitted);
+    let st = host.state();
+    ensure!(by == st.owner || by == auth.agent || Some(by) == st.cosigner, Error::NotPermitted);
+    // Only authorisations that provably were not co-signed can be cancelled (and refunded):
+    // `Committed` ones may already be paid, so their budget stays booked.
     ensure!(matches!(auth.status, AuthStatus::Pending | AuthStatus::Approved), Error::WrongStatus);
     let was_pending = auth.status == AuthStatus::Pending;
     auth.status = AuthStatus::Cancelled;
@@ -202,8 +206,41 @@ fn cancel(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) -> 
     Ok(())
 }
 
-/// Agent or co-signer writes the x402 settlement transaction hash. Requires an `Approved`,
-/// unexpired x402 authorisation of the current agent generation.
+/// The co-signer commits to the single transfer it is about to sign (its signing digest).
+/// Atomic on chain, so an authorisation can be co-signed at most once even across co-signer
+/// restarts or several co-signer instances. Re-checks every live control before committing.
+#[receive(
+    contract = "agent_spend_guard",
+    name = "commitPayment",
+    parameter = "CommitParams",
+    error = "Error",
+    mutable,
+    enable_logger
+)]
+fn commit_payment(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) -> ContractResult<()> {
+    let p: CommitParams = ctx.parameter_cursor().get()?;
+    let by = sender_account(ctx)?;
+    let now = ctx.metadata().slot_time();
+    let state = host.state();
+    ensure!(Some(by) == state.cosigner, Error::NotPermitted);
+    ensure!(!state.paused, Error::Paused);
+    let mut auth = get_auth(state, p.id)?;
+    ensure!(auth.mode == PayMode::X402 && auth.status == AuthStatus::Approved, Error::WrongStatus);
+    ensure!(now < auth.expires_at, Error::Expired);
+    let rec = state.agents.get(&auth.agent).map(|r| r.clone()).ok_or(Error::StaleGeneration)?;
+    ensure!(rec.generation == auth.generation, Error::StaleGeneration);
+    ensure!(!rec.paused, Error::AgentPaused);
+    ensure!(rec.allowlist.contains(&auth.payee), Error::NotAllowlisted);
+    auth.status = AuthStatus::Committed;
+    auth.commitment = Some(p.digest);
+    let _ = host.state_mut().auths.insert(p.id, auth);
+    logger.log(&Event::PaymentCommitted { id: p.id, digest: p.digest })?;
+    Ok(())
+}
+
+/// Agent or co-signer writes the finalised x402 settlement transaction hash of a `Committed`
+/// authorisation. A transaction hash can settle only one authorisation. Off-chain reconcilers can
+/// check that the finalised transaction's sign-hash equals the committed digest.
 #[receive(
     contract = "agent_spend_guard",
     name = "recordSettlement",
@@ -215,21 +252,18 @@ fn cancel(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) -> 
 fn record_settlement(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logger) -> ContractResult<()> {
     let p: SettleParams = ctx.parameter_cursor().get()?;
     let by = sender_account(ctx)?;
-    let now = ctx.metadata().slot_time();
     let state = host.state();
     let mut auth = get_auth(state, p.id)?;
     ensure!(by == auth.agent || Some(by) == state.cosigner, Error::NotPermitted);
-    ensure!(auth.mode == PayMode::X402, Error::WrongStatus);
-    ensure!(auth.status == AuthStatus::Approved, Error::WrongStatus);
-    // A settlement is recorded after the transfer finalised; allow a short grace period after
-    // expiry for the facilitator round-trip (the co-signer refuses to sign after expiry).
-    let grace = auth.expires_at.checked_add(Duration::from_millis(10 * 60 * 1000)).ok_or(Error::Overflow)?;
-    ensure!(now < grace, Error::Expired);
-    let gen_ok = state.agents.get(&auth.agent).map(|r| r.generation == auth.generation).unwrap_or(false);
-    ensure!(gen_ok, Error::StaleGeneration);
+    ensure!(auth.mode == PayMode::X402 && auth.status == AuthStatus::Committed, Error::WrongStatus);
+    ensure!(state.settled_txs.get(&p.tx_hash).is_none(), Error::DuplicateSettlement);
+    // No expiry or generation check: once committed the payment may be on chain, and its record
+    // must always be writable (a committed budget is never refunded anyway).
     auth.status = AuthStatus::Settled;
     auth.settlement = Some(p.tx_hash);
-    let _ = host.state_mut().auths.insert(p.id, auth);
+    let state = host.state_mut();
+    let _ = state.settled_txs.insert(p.tx_hash, p.id);
+    let _ = state.auths.insert(p.id, auth);
     logger.log(&Event::Settled { id: p.id, tx_hash: Some(p.tx_hash) })?;
     Ok(())
 }

@@ -10,10 +10,12 @@ export class MockLedger {
   account(address) { return this.accounts.get(address) ?? null; }
 
   /** Apply a finalised transfer (already verified). */
-  apply(txHash, { from, to, amount }) {
+  apply(txHash, { from, to, amount, nonce }) {
     const a = this.accounts.get(from);
-    const b = this.accounts.get(to) ?? (this.open(to, { keys: [] }), this.accounts.get(to));
+    if (this.txs.has(txHash)) throw new Error('duplicate_transaction');
+    if (!a || BigInt(nonce) !== BigInt(a.nonce)) throw new Error('nonce_mismatch');
     if (a.balance < amount) throw new Error('insufficient_balance');
+    const b = this.accounts.get(to) ?? (this.open(to, { keys: [] }), this.accounts.get(to));
     a.balance -= amount;
     b.balance += amount;
     a.nonce += 1;

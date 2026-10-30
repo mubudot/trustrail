@@ -12,7 +12,7 @@ fn badge7(env: &Env) -> Option<BadgeRef> { Some(BadgeRef { registry: env.registr
 #[test]
 fn only_owner_administers() {
     let mut env = setup(false, OWNER);
-    let p = RegisterAgentParams { agent: AGENT, badge: None, policy: policy(), allowlist: vec![PAYEE] };
+    let p = RegisterAgentParams { agent: AGENT, wallet: WALLET, badge: None, policy: policy(), allowlist: vec![PAYEE] };
     assert_eq!(env.fails(STRANGER, "registerAgent", &p), Error::NotOwner);
     env.register(None).unwrap();
     assert_eq!(env.register(None).map(|_| ()).map_err(|e| err_of(&e).unwrap()), Err(Error::AlreadyRegistered));
@@ -22,20 +22,68 @@ fn only_owner_administers() {
 }
 
 #[test]
-fn x402_flow_under_threshold_then_settle() {
+fn x402_flow_commit_then_settle() {
     let mut env = setup(false, OWNER);
     env.register(None).unwrap();
     let out = env.auth(40, PayMode::X402).unwrap();
     assert_eq!(out.status, AuthStatus::Approved);
     assert_eq!(env.agent().spent_today_now, 40);
-    // stranger cannot record settlement; agent and cosigner can
     let s = SettleParams { id: out.id, tx_hash: HashSha2256([5u8; 32]) };
+    // no settlement without the co-signer's commitment
+    assert_eq!(env.fails(AGENT, "recordSettlement", &s), Error::WrongStatus);
+    let c = CommitParams { id: out.id, digest: HashSha2256([6u8; 32]) };
+    assert_eq!(env.fails(AGENT, "commitPayment", &c), Error::NotPermitted);
+    assert_eq!(env.fails(STRANGER, "commitPayment", &c), Error::NotPermitted);
+    env.ok(COSIGNER, "commitPayment", &c);
+    // single use: a second commitment (e.g. a restarted co-signer) is refused on chain
+    assert_eq!(env.fails(COSIGNER, "commitPayment", &c), Error::WrongStatus);
+    // a committed payment can no longer be cancelled for a refund
+    assert_eq!(env.fails(AGENT, "cancel", &out.id), Error::WrongStatus);
     assert_eq!(env.fails(STRANGER, "recordSettlement", &s), Error::NotPermitted);
-    env.ok(COSIGNER, "recordSettlement", &s);
+    env.ok(AGENT, "recordSettlement", &s);
     let a = env.authorization(out.id);
     assert_eq!(a.auth.status, AuthStatus::Settled);
+    assert_eq!(a.auth.commitment, Some(HashSha2256([6u8; 32])));
     assert_eq!(a.auth.settlement, Some(HashSha2256([5u8; 32])));
     assert_eq!(env.fails(AGENT, "recordSettlement", &s), Error::WrongStatus); // no double settle
+    // one transaction cannot settle two authorisations
+    let out2 = env.auth(10, PayMode::X402).unwrap();
+    env.ok(COSIGNER, "commitPayment", &CommitParams { id: out2.id, digest: HashSha2256([7u8; 32]) });
+    let s2 = SettleParams { id: out2.id, tx_hash: HashSha2256([5u8; 32]) };
+    assert_eq!(env.fails(AGENT, "recordSettlement", &s2), Error::DuplicateSettlement);
+    assert_eq!(env.agent().spent_today_now, 50);
+}
+
+#[test]
+fn commit_rechecks_live_controls() {
+    let mut env = setup(false, OWNER);
+    env.register(None).unwrap();
+    let a = env.auth(10, PayMode::X402).unwrap();
+    let c = |id| CommitParams { id, digest: HashSha2256([1; 32]) };
+    env.ok(OWNER, "setPaused", &true);
+    assert_eq!(env.fails(COSIGNER, "commitPayment", &c(a.id)), Error::Paused);
+    env.ok(OWNER, "setPaused", &false);
+    env.ok(OWNER, "setAgentPaused", &SetAgentPausedParams { agent: AGENT, paused: true });
+    assert_eq!(env.fails(COSIGNER, "commitPayment", &c(a.id)), Error::AgentPaused);
+    env.ok(OWNER, "setAgentPaused", &SetAgentPausedParams { agent: AGENT, paused: false });
+    env.ok(OWNER, "setAllowlist", &SetAllowlistParams { agent: AGENT, allowlist: vec![] });
+    assert_eq!(env.fails(COSIGNER, "commitPayment", &c(a.id)), Error::NotAllowlisted);
+    // an approved, never-committed authorisation can be cancelled and is refunded
+    env.ok(AGENT, "cancel", &a.id);
+    assert_eq!(env.agent().spent_today_now, 0);
+}
+
+#[test]
+fn wallet_must_be_a_separate_non_payee_account() {
+    let mut env = setup(false, OWNER);
+    for wallet in [AGENT, OWNER, PAYEE] {
+        let p = RegisterAgentParams { agent: AGENT, wallet, badge: None, policy: policy(), allowlist: vec![PAYEE] };
+        assert_eq!(env.fails(OWNER, "registerAgent", &p), Error::InvalidWallet);
+    }
+    env.register(None).unwrap();
+    assert_eq!(env.agent().record.wallet, WALLET);
+    let p = SetAllowlistParams { agent: AGENT, allowlist: vec![PAYEE, WALLET] };
+    assert_eq!(env.fails(OWNER, "setAllowlist", &p), Error::InvalidWallet);
 }
 
 #[test]
@@ -84,10 +132,9 @@ fn expiry_blocks_approval_and_settlement() {
     env.tick_ms(60_000);
     assert!(env.authorization(pending.id).expired);
     assert_eq!(env.fails(OWNER, "approve", &pending.id), Error::Expired);
-    // settlement has a 10-minute grace after expiry, then refuses
-    env.tick_ms(10 * 60_000);
-    let s = SettleParams { id: approved.id, tx_hash: HashSha2256([1; 32]) };
-    assert_eq!(env.fails(AGENT, "recordSettlement", &s), Error::Expired);
+    // the co-signer cannot commit after expiry
+    let c = CommitParams { id: approved.id, digest: HashSha2256([1; 32]) };
+    assert_eq!(env.fails(COSIGNER, "commitPayment", &c), Error::Expired);
     // fail closed: expired reservations still count until cancelled
     assert_eq!(env.agent().spent_today_now, 70);
     env.ok(AGENT, "cancel", &pending.id);
@@ -123,6 +170,7 @@ fn escrow_refuses_without_funds() {
     let mut env = setup(false, OWNER);
     let p = RegisterAgentParams {
         agent: AGENT,
+        wallet: WALLET,
         badge: None,
         policy: SpendPolicy { per_tx_cap: 5_000_000, daily_cap: 5_000_000, approval_threshold: 5_000_000, ..policy() },
         allowlist: vec![PAYEE],
@@ -156,8 +204,8 @@ fn remove_and_reregister_invalidates_old_authorizations() {
     env.register(None).unwrap();
     assert_eq!(env.agent().record.generation, 2);
     assert_eq!(env.fails(OWNER, "approve", &pend.id), Error::StaleGeneration);
-    let s = SettleParams { id: appr.id, tx_hash: HashSha2256([1; 32]) };
-    assert_eq!(env.fails(AGENT, "recordSettlement", &s), Error::StaleGeneration);
+    let c = CommitParams { id: appr.id, digest: HashSha2256([1; 32]) };
+    assert_eq!(env.fails(COSIGNER, "commitPayment", &c), Error::StaleGeneration);
     assert_eq!(env.agent().spent_today_now, 0);
 }
 

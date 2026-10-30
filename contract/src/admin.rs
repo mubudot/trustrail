@@ -12,6 +12,7 @@ fn init(ctx: &InitContext, state_builder: &mut StateBuilder, _amount: Amount) ->
         agents:          state_builder.new_map(),
         generations:     state_builder.new_map(),
         auths:           state_builder.new_map(),
+        settled_txs:     state_builder.new_map(),
         next_auth_id:    0,
         escrow_reserved: 0,
     })
@@ -30,13 +31,16 @@ fn register_agent(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Log
     ensure_owner(ctx, host.state())?;
     ensure!(host.state().agents.get(&p.agent).is_none(), Error::AlreadyRegistered);
     validate_policy(&p.policy, &p.allowlist)?;
+    // The paying wallet must be a separate account and never a payee or the owner.
+    ensure!(p.wallet != p.agent && p.wallet != host.state().owner && !p.allowlist.contains(&p.wallet), Error::InvalidWallet);
     check_badge(host, &p.badge)?;
     let today = day_of(ctx.metadata().slot_time());
     let state = host.state_mut();
-    let generation = state.generations.get(&p.agent).map(|g| *g).unwrap_or(0) + 1;
+    let generation = state.generations.get(&p.agent).map(|g| *g).unwrap_or(0).checked_add(1).ok_or(Error::Overflow)?;
     let _ = state.generations.insert(p.agent, generation);
     let _ = state.agents.insert(p.agent, AgentRecord {
         badge: p.badge,
+        wallet: p.wallet,
         policy: p.policy,
         allowlist: p.allowlist,
         paused: false,
@@ -45,7 +49,7 @@ fn register_agent(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Log
         spent_today: 0,
         total: 0,
     });
-    logger.log(&Event::AgentRegistered { agent: p.agent, generation, badge: p.badge })?;
+    logger.log(&Event::AgentRegistered { agent: p.agent, wallet: p.wallet, generation, badge: p.badge })?;
     Ok(())
 }
 
@@ -103,6 +107,7 @@ fn set_allowlist(ctx: &ReceiveContext, host: &mut Host<State>, logger: &mut Logg
     let state = host.state_mut();
     let mut rec = state.agents.get(&p.agent).map(|r| r.clone()).ok_or(Error::NotAgent)?;
     validate_policy(&rec.policy, &p.allowlist)?;
+    ensure!(!p.allowlist.contains(&rec.wallet), Error::InvalidWallet);
     rec.allowlist = p.allowlist.clone();
     let _ = state.agents.insert(p.agent, rec);
     logger.log(&Event::AllowlistUpdated { agent: p.agent, allowlist: p.allowlist })?;

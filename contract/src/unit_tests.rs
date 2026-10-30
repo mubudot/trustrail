@@ -11,6 +11,7 @@ fn policy() -> SpendPolicy {
 fn rec() -> AgentRecord {
     AgentRecord {
         badge: None,
+        wallet: AccountAddress([9u8; 32]),
         policy: policy(),
         allowlist: vec![B],
         paused: false,
@@ -137,6 +138,7 @@ fn shared_policy_vectors() {
         }
         let record = AgentRecord {
             badge:       None,
+            wallet:      acct(99),
             policy:      SpendPolicy {
                 asset:              asset_of(a["asset"].as_str().unwrap()),
                 per_tx_cap:         a["per_tx_cap"].as_u64().unwrap(),

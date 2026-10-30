@@ -27,3 +27,20 @@ export function evaluate({ contractPaused = false, agent, payee, asset, amount, 
   if (after > agent.policy.dailyCap) return fail('DailyCap');
   return { ok: true, decision: amount > agent.policy.approvalThreshold ? 'NeedsApproval' : 'Approve' };
 }
+
+export const MAX_ALLOWLIST = 32;
+export const MIN_TTL_MS = 1_000n;
+export const MAX_TTL_MS = DAY_MS;
+
+/** Mirror of contract `validate_policy`: returns an error name or null. */
+export function validatePolicy(policy, allowlist) {
+  if (policy.perTxCap <= 0n || policy.dailyCap < policy.perTxCap) return 'InvalidPolicy';
+  if (policy.authTtlMs < MIN_TTL_MS || policy.authTtlMs > MAX_TTL_MS) return 'InvalidPolicy';
+  if (policy.asset !== 'CCD') {
+    const id = policy.asset.startsWith('PLT:') ? policy.asset.slice(4) : '';
+    if (id.length === 0 || id.length > 64) return 'InvalidPolicy';
+  }
+  if (allowlist.length > MAX_ALLOWLIST) return 'AllowlistTooLong';
+  if (new Set(allowlist).size !== allowlist.length) return 'InvalidPolicy';
+  return null;
+}

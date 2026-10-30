@@ -25,10 +25,12 @@ test('shared policy vectors', () => {
   }
 });
 
-test('error codes match the contract enum order', () => {
+test('error names/codes match the Rust enum in contract/src/error.rs', () => {
+  const src = readFileSync(new URL('../../contract/src/error.rs', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('pub enum Error {'), src.indexOf('}', src.indexOf('pub enum Error {')));
+  const rust = [...body.matchAll(/^\s+([A-Z][A-Za-z]+),/gm)].map((m) => m[1]);
+  assert.deepEqual(rust, ERRORS);
   assert.equal(codeOf('ParseParams'), -1);
-  assert.equal(codeOf('NotOwner'), -4);
-  assert.equal(codeOf('ContractSender'), -29);
   assert.equal(nameOf(-12), 'DailyCap');
-  assert.equal(ERRORS.length, 29);
+  assert.equal(codeOf('InvalidWallet'), -ERRORS.length);
 });

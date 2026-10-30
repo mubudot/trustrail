@@ -3,7 +3,7 @@
 Give an AI agent a wallet without giving it your wallet. A verified human owner sets a spending
 policy on chain; the agent pays other agents and APIs with **x402** on Concordium, but every payment
 must first get an on-chain authorisation from the **agent_spend_guard** contract, and the agent's
-paying account is **2-of-2**: the agent holds one key, a small deterministic co-signer holds the
+paying wallet is **2-of-2**: the agent holds one key, a small deterministic co-signer holds the
 other and signs only transfers that exactly match an approved authorisation. Payees must present a
 **Verified by Concordium** badge that is bound to the account being paid. Every step leaves an
 on-chain event and a hash-chained audit entry.
@@ -32,9 +32,9 @@ AI agent ── preflight ── badge check ── sponsored V1 transfer, signe
 | pay an address it was talked into | payee badge check (`payee_not_bound_to_badge`), contract allowlist (`NotAllowlisted`) |
 | drain the budget in one or many payments | per-tx and UTC-daily caps on chain; pending requests reserve budget |
 | make a large payment without a human | approval threshold → `Pending` until the owner approves |
-| pay without asking the contract, or pay more than authorised | 2-of-2 account: the co-signer signs only the exact authorised payee/amount/asset/purpose, once, before expiry |
+| pay without asking the contract, or pay more than authorised | 2-of-2 wallet: the co-signer signs only the exact authorised payee/amount/asset/purpose, after committing that transfer's digest on chain (once, before expiry; never refundable afterwards) |
 | keep going after misbehaving | owner pause (global/per agent); the agent can pause itself; losing the badge auto-pauses (`recheckBadge`) |
-| hide what it did | contract events + authorisation records with the x402 settlement tx hash; hash-chained off-chain log |
+| hide what it did | contract events + authorisation records (committed digest, x402 settlement tx hash); hash-chained off-chain log (preflight refusals are off-chain only) |
 
 ## Layout
 
@@ -70,8 +70,11 @@ cd agent && npm test && npm run demo:mock
 cd contract && cargo test          # unit tests + shared vectors + Wasm integration tests
 ```
 
+Current counts: contract 9 unit + 16 integration, client 24 (see STATUS.md).
+
 `build-wasm.sh` uses `cargo concordium build --schema-embed` when cargo-concordium is installed and
 always also builds the raw module for the tests.
+No network access and no keys are needed for any of the above.
 
 ## Concordium components used
 

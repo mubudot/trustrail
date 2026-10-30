@@ -16,7 +16,7 @@ export const CCD = 1_000_000n; // microCCD per CCD
 
 // Placeholder account names (real testnet addresses are base58; the mock only needs unique ids).
 export const ACCOUNTS = {
-  owner: 'owner-account', agent: 'agent-account', cosigner: 'cosigner-account',
+  owner: 'owner-account', agent: 'agent-account', wallet: 'agent-wallet-account', cosigner: 'cosigner-account',
   facilitator: 'facilitator-account', dataSeller: 'data-seller-account',
   shadySeller: 'unverified-seller-account', attacker: 'attacker-account',
 };
@@ -29,18 +29,21 @@ export function createWorld({ startMs = Date.UTC(2026, 11, 1, 9, 0, 0), policy }
   const agentKeys = newKeyPair();
   const cosignerKeys = newKeyPair();
   const ledger = new MockLedger();
-  ledger.open(ACCOUNTS.agent, { keys: [agentKeys.publicKey, cosignerKeys.publicKey], threshold: 2, balance: 100n * CCD });
+  // The agent's paying wallet: key 0 = agent, key 1 = co-signer, threshold 2. The agent account itself
+  // (single key) only talks to the guard.
+  ledger.open(ACCOUNTS.wallet, { keys: [agentKeys.publicKey, cosignerKeys.publicKey], threshold: 2, balance: 100n * CCD });
   ledger.open(ACCOUNTS.facilitator, { keys: [newKeyPair().publicKey], balance: 10n * CCD });
 
   const guard = new MockGuardChain({ owner: ACCOUNTS.owner, cosigner: ACCOUNTS.cosigner, clock });
   guard.registerAgent(ACCOUNTS.owner, {
     agent: ACCOUNTS.agent,
+    wallet: ACCOUNTS.wallet,
     badge: { registry: 'cis8004:12802.0', tokenId: 41n },
     policy: policy ?? { asset: 'CCD', perTxCap: 5n * CCD, dailyCap: 12n * CCD, approvalThreshold: 2n * CCD, authTtlMs: 120_000n },
     allowlist: [ACCOUNTS.dataSeller, ACCOUNTS.shadySeller],
   });
 
-  const facilitator = new MockFacilitator({ ledger, address: ACCOUNTS.facilitator, clock });
+  const facilitator = new MockFacilitator({ ledger, address: ACCOUNTS.facilitator, network: NETWORK, clock });
   const dataSeller = new MockSeller({
     payTo: ACCOUNTS.dataSeller, facilitator, network: NETWORK, badge: 'BadgeDataSeller',
     routes: {
@@ -62,7 +65,7 @@ export function createWorld({ startMs = Date.UTC(2026, 11, 1, 9, 0, 0), policy }
   const resolver = new FixtureBadgeResolver({
     BadgeDataSeller: { valid: true, active: true, owner: 'data-seller-owner', agentWallet: ACCOUNTS.dataSeller },
   });
-  const cosigner = new Cosigner({ guard, keyPair: cosignerKeys, agentAccount: ACCOUNTS.agent, agentPublicKey: agentKeys.publicKey, clock });
+  const cosigner = new Cosigner({ guard, account: ACCOUNTS.cosigner, keyPair: cosignerKeys, agentAccount: ACCOUNTS.agent, agentPublicKey: agentKeys.publicKey, clock });
   const audit = new AuditLog({ clock });
   const agent = new TrustedAgent({
     account: ACCOUNTS.agent, agentKey: agentKeys.privateKey, guard, cosigner, resolver, audit, fetchImpl,

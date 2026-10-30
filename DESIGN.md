@@ -54,11 +54,15 @@ x402 payment. So:
 
 1. **Policy lives on chain** (the guard contract): limits, allowlist, approval, budget accounting,
    audit — the same for every client, checkable on CCDExplorer.
-2. **Key custody makes it binding**: the agent's paying account has **two keys, threshold 2**
-   (Concordium accounts natively support multi-key credentials). The agent holds one key; the
-   co-signer holds the other and signs only transfers that match an on-chain `Approved`
-   authorisation. The agent alone cannot move funds; the co-signer alone has no reason to (and its
-   logic is deterministic and small enough to audit).
+2. **Key custody makes it binding**: each agent has two accounts. Its **control account** (single
+   key) calls the guard (`authorize`, `cancel`, `recordSettlement`). Its **wallet** holds the
+   budget and pays x402; it has **two keys, threshold 2** (Concordium accounts support several keys
+   per credential): the agent holds one, the co-signer the other. The co-signer signs only a
+   transfer that matches an on-chain `Approved` authorisation, and first calls
+   `commitPayment(id, digest)` — an atomic on-chain Approved → Committed transition — so each
+   authorisation is co-signed at most once, even across restarts or replicas, and a committed
+   authorisation can never be cancelled for a refund. The agent alone cannot move funds; the
+   co-signer alone has no reason to (its logic is deterministic and small enough to audit).
 3. **Escrow mode** for agent-to-agent CCD payments that do not need x402: the contract holds the
    budget and transfers directly — fully on-chain enforcement, no co-signer.
 
@@ -72,9 +76,14 @@ Testnet demo can start with a single-key agent account (co-signer simulated) and
 - Order of checks (first failure wins): contract paused → agent registered → agent paused →
   asset matches policy → amount > 0 → payee allowlisted → amount ≤ per-tx cap → spent_today +
   amount ≤ daily cap → (amount > approval threshold ? Pending : Approved).
-- Authorisations expire `auth_ttl_ms` after creation (max 1 day). Expired Approved/Pending ones can
-  no longer be approved or settled; their reservation is **not** refunded automatically (fail closed);
-  owner or agent may `cancel`, which refunds only if still the same day.
+- Lifecycle: `Pending` → (owner) `Approved` → (co-signer `commitPayment`) `Committed` → (agent or
+  co-signer `recordSettlement`, unique tx hash) `Settled`; or `Rejected` / `Cancelled`. Escrow-mode
+  authorisations go straight to `Settled` when the contract pays.
+- Authorisations expire `auth_ttl_ms` after creation (max 1 day). Expired Pending/Approved ones can
+  no longer be approved or committed; their reservation is **not** refunded automatically (fail
+  closed); owner, agent or co-signer may `cancel` (Pending/Approved only), which refunds only if
+  still the same day. Committed authorisations stay booked: the payment may be on chain.
+- Daily caps charge the authorisation's UTC day.
 - `generation` bumps on removeAgent/re-register so stale authorisations cannot be approved after a
   policy reset (idea from near-agent-spend-guard).
 - Allowlist bounded (≤ 32 payees); empty allowlist = nothing payable.
@@ -89,7 +98,7 @@ Testnet demo can start with a single-key agent account (co-signer simulated) and
 - `x402-flow.mjs` — buyer flow: request → 402 + PaymentRequirements → preflight → on-chain
   `authorize` → build sponsored V1 transfer → co-signer → retry with `PAYMENT-SIGNATURE` → record
   settlement.
-- `cosigner.mjs` — the binding check: payload shape, sender = agent, payee/amount/asset equal the
+- `cosigner.mjs` — the binding check: payload shape, sender = agent wallet, payee/amount/asset equal the
   authorisation, tx expiry ≤ authorisation expiry and ≤ 10 min, one operation, sponsor ≠ payee,
   authorisation not yet consumed.
 - `badge.mjs` — counterparty badge check (hosted MCP REST in live mode, fixture in mock mode).

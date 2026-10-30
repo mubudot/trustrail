@@ -6,6 +6,7 @@ export const ERRORS = [
   'AllowlistTooLong', 'AlreadyRegistered', 'BadgeRequired', 'WrongRegistry', 'BadgeNotOwned',
   'RegistryCallFailed', 'UnknownAuthorization', 'WrongStatus', 'Expired', 'StaleGeneration',
   'NotPermitted', 'EscrowOnlyCcd', 'InsufficientFunds', 'TransferFailed', 'Overflow', 'ContractSender',
+  'DuplicateSettlement', 'InvalidWallet',
 ];
 
 export const codeOf = (name) => -(ERRORS.indexOf(name) + 1);

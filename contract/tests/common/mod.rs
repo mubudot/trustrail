@@ -9,6 +9,8 @@ pub const AGENT: AccountAddress = AccountAddress([1u8; 32]);
 pub const PAYEE: AccountAddress = AccountAddress([2u8; 32]);
 pub const STRANGER: AccountAddress = AccountAddress([3u8; 32]);
 pub const COSIGNER: AccountAddress = AccountAddress([4u8; 32]);
+/// The agent's 2-of-2 paying account (agent key + co-signer key).
+pub const WALLET: AccountAddress = AccountAddress([5u8; 32]);
 pub const START_MS: u64 = 1_800_000_000_000; // a fixed block time
 pub const ENERGY: Energy = Energy { energy: 100_000 };
 
@@ -31,7 +33,7 @@ pub fn policy() -> SpendPolicy {
 /// `with_registry`: bind the guard to a CIS-2 registry and mint agent badge #7 to `badge_holder`.
 pub fn setup(with_registry: bool, badge_holder: AccountAddress) -> Env {
     let mut chain = Chain::builder().block_time(Timestamp::from_timestamp_millis(START_MS)).build().unwrap();
-    for a in [OWNER, AGENT, PAYEE, STRANGER, COSIGNER] {
+    for a in [OWNER, AGENT, PAYEE, STRANGER, COSIGNER, WALLET] {
         chain.create_account(Account::new(a, Amount::from_ccd(10_000)));
     }
     let registry = if with_registry {
@@ -109,7 +111,7 @@ impl Env {
     }
 
     pub fn register(&mut self, badge: Option<BadgeRef>) -> Result<ContractInvokeSuccess, ContractInvokeError> {
-        let p = RegisterAgentParams { agent: AGENT, badge, policy: policy(), allowlist: vec![PAYEE] };
+        let p = RegisterAgentParams { agent: AGENT, wallet: WALLET, badge, policy: policy(), allowlist: vec![PAYEE] };
         self.call(OWNER, "registerAgent", &p, Amount::zero())
     }
 
@@ -133,6 +135,12 @@ impl Env {
     pub fn agent(&self) -> AgentView {
         let v: Option<AgentView> = self.view("agent", &AGENT);
         v.expect("agent exists")
+    }
+
+    /// Co-signer commits to a transfer digest, then the agent records the settlement tx hash.
+    pub fn commit_and_settle(&mut self, id: u64, tx: u8) {
+        self.ok(COSIGNER, "commitPayment", &CommitParams { id, digest: HashSha2256([tx; 32]) });
+        self.ok(AGENT, "recordSettlement", &SettleParams { id, tx_hash: HashSha2256([tx; 32]) });
     }
 
     pub fn tick_ms(&mut self, ms: u64) { self.chain.tick_block_time(Duration::from_millis(ms)).unwrap(); }

@@ -5,13 +5,14 @@ import { canonical, sha256Hex } from '../util/canonical.mjs';
 import { MAX_EXPIRY_S, signingDigest, transferOf, verifyDigest } from '../payments/tx.mjs';
 
 export class MockFacilitator {
-  constructor({ ledger, address, clock = () => Date.now() }) {
+  constructor({ ledger, address, network, clock = () => Date.now() }) {
     this.ledger = ledger;
+    this.network = network;
     this.address = address;
     this.clock = clock;
   }
 
-  supported() { return { kinds: [{ scheme: 'exact', network: 'ccd:testnet' }], extra: { feePayer: this.address } }; }
+  supported() { return { kinds: [{ scheme: 'exact', network: this.network }], extra: { feePayer: this.address } }; }
 
   verify(payload, requirements) {
     const bad = (reason) => ({ isValid: false, invalidReason: reason });
@@ -32,6 +33,11 @@ export class MockFacilitator {
     // rule 8: sender signatures checked against the on-chain keys and threshold
     const acct = this.ledger.account(tx.header.sender);
     if (!acct) return bad('invalid_sender_address');
+    try {
+      if (BigInt(tx.header.nonce) !== BigInt(acct.nonce)) return bad('preflight_nonce_mismatch');
+    } catch {
+      return bad('preflight_nonce_mismatch');
+    }
     const digest = signingDigest(tx);
     const sigs = tx.signatures?.sender?.[0] ?? {};
     const valid = Object.entries(sigs).filter(([i, s]) => acct.keys[i] && verifyDigest(acct.keys[i], digest, s)).length;
@@ -46,7 +52,7 @@ export class MockFacilitator {
     const tx = payload.signedTransaction;
     const txHash = sha256Hex(canonical(tx));
     const t = transferOf(tx);
-    this.ledger.apply(txHash, { from: tx.header.sender, to: t.payTo, amount: t.amount });
+    this.ledger.apply(txHash, { from: tx.header.sender, to: t.payTo, amount: t.amount, nonce: tx.header.nonce });
     return { success: true, transaction: txHash, network: requirements.network, payer: tx.header.sender };
   }
 }

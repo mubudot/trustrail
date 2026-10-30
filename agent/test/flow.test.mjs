@@ -68,3 +68,30 @@ test('owner pause stops spending immediately', async () => {
   const r = await w.agent.buy('https://data.example/weather');
   assert.equal(r.reason, 'Paused');
 });
+
+test('settlement failure after commit keeps the budget booked and is logged for reconciliation', async () => {
+  const w = createWorld();
+  const realFetch = w.agent.fetchImpl;
+  w.agent.fetchImpl = async (url, init) => {
+    if (init?.headers?.['PAYMENT-SIGNATURE']) throw new Error('connection reset');
+    return realFetch(url, init);
+  };
+  const r = await w.agent.buy('https://data.example/weather');
+  assert.equal(r.status, 'settlement_unknown');
+  assert.equal(w.guard.authorization(r.authId).auth.status, 'Committed');
+  assert.equal(w.guard.agent(ACCOUNTS.agent).spentTodayNow, CCD / 2n);
+  assert.equal(w.audit.entries.at(-1).event, 'settlement_unknown');
+});
+
+test('mock guard validates policy and wallet like the contract', () => {
+  const w = createWorld();
+  const base = { asset: 'CCD', perTxCap: 10n, dailyCap: 10n, approvalThreshold: 5n, authTtlMs: 60_000n };
+  const reg = (patch, allowlist = ['p'], wallet = 'w2') => () => w.guard.registerAgent(ACCOUNTS.owner, { agent: 'a2', wallet, policy: { ...base, ...patch }, allowlist });
+  assert.throws(reg({ authTtlMs: 0n }), /InvalidPolicy/);
+  assert.throws(reg({ asset: 'PLT:' }), /InvalidPolicy/);
+  assert.throws(reg({}, ['p', 'p']), /InvalidPolicy/);
+  assert.throws(reg({}, Array.from({ length: 33 }, (_, i) => `p${i}`)), /AllowlistTooLong/);
+  assert.throws(reg({}, ['p'], 'a2'), /InvalidWallet/);
+  assert.throws(reg({}, ['w2'], 'w2'), /InvalidWallet/);
+  assert.throws(() => w.guard.setAllowlist(ACCOUNTS.owner, { agent: ACCOUNTS.agent, allowlist: [ACCOUNTS.wallet] }), /InvalidWallet/);
+});

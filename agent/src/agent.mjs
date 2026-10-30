@@ -66,23 +66,42 @@ export class TrustedAgent {
   async #pay(authId, url, requirements) {
     const auth = this.guard.authorization(authId)?.auth;
     if (!auth) return this.#refuse('pay', 'unknown_authorization', { authId });
+    const wallet = this.guard.agent(this.account)?.record.wallet;
+    if (!wallet) return this.#refuse('pay', 'NotAgent', { authId });
     const tx = buildAgentSignedTx({
-      agentAccount: this.account, agentKey: this.agentKey, nonce: this.nonceOf(this.account),
+      agentAccount: wallet, agentKey: this.agentKey, nonce: this.nonceOf(wallet),
       requirements, nowS: Math.floor(this.clock() / 1000), notAfterS: Number(auth.expiresAt / 1000n),
     });
     try {
       tx.signatures.sender[0][1] = this.cosigner.cosign({ authId, tx, resourceUrl: url, requirements });
     } catch (e) {
       if (!(e instanceof CosignRefused)) throw e;
-      this.guard.cancel(this.account, authId);
-      return this.#refuse('cosigner', e.reason, { authId });
+      // Refused before commitPayment, so the authorisation was never co-signed: release its budget.
+      const released = this.cosigner.release(authId);
+      return this.#refuse('cosigner', e.reason, { authId, released });
     }
-    const { res, settlement } = await submitPayment({ fetchImpl: this.fetchImpl, url, requirements, tx });
+    // From here the authorisation is Committed on chain and its budget stays booked: the transfer
+    // may be finalised even if the HTTP round-trip fails, so nothing is cancelled. Unknown
+    // outcomes are logged for reconciliation against the chain (committed digest -> finalised tx).
+    let res;
+    let settlement;
+    try {
+      ({ res, settlement } = await submitPayment({ fetchImpl: this.fetchImpl, url, requirements, tx }));
+    } catch (e) {
+      this.audit.append('settlement_unknown', { authId, error: String(e?.message ?? e) });
+      return { status: 'settlement_unknown', authId };
+    }
     if (res.status !== 200 || !settlement?.success) {
-      this.guard.cancel(this.account, authId);
-      return this.#refuse('facilitator', res.json?.error ?? 'settlement_failed', { authId });
+      this.audit.append('settlement_unknown', { authId, httpStatus: res.status, error: res.json?.error ?? 'settlement_failed' });
+      return { status: 'settlement_unknown', authId, reason: res.json?.error ?? 'settlement_failed' };
     }
-    this.guard.recordSettlement(this.account, { id: authId, txHash: settlement.transaction });
+    try {
+      this.guard.recordSettlement(this.account, { id: authId, txHash: settlement.transaction });
+    } catch (e) {
+      if (!(e instanceof GuardError)) throw e;
+      this.audit.append('settlement_record_failed', { authId, txHash: settlement.transaction, reason: e.code });
+      return { status: 'paid_unrecorded', authId, txHash: settlement.transaction, reason: e.code, data: res.json };
+    }
     this.audit.append('settled', { authId, txHash: settlement.transaction, amount: BigInt(requirements.amount), payTo: requirements.payTo });
     return { status: 'paid', authId, txHash: settlement.transaction, data: res.json };
   }

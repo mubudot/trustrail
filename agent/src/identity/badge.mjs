@@ -12,7 +12,7 @@ export class FixtureBadgeResolver {
 
 /**
  * Live resolver against the hosted Agent Registry REST endpoints (no keys needed).
- * NOT exercised by the offline tests; response fields are read defensively.
+ * Offline tests use response fixtures; no live requests are made by the test suite.
  */
 export class HostedBadgeResolver {
   constructor({ baseUrl = HOSTED_MCP, fetchImpl = globalThis.fetch } = {}) {
@@ -23,11 +23,11 @@ export class HostedBadgeResolver {
     const res = await this.fetch(`${this.baseUrl}/v1/check-badge/${encodeURIComponent(badge)}`);
     if (!res.ok) return { valid: false, active: false };
     const j = await res.json();
-    const rec = j.agent ?? j.record ?? j.results?.[0] ?? {};
+    const rec = j.on_chain ?? j.agent ?? j.record ?? j.results?.[0] ?? {};
     return {
       valid: j.badge_valid === true,
-      active: (rec.status ?? 'Active') === 'Active',
-      owner: rec.owner,
+      active: rec.status === 'Active',
+      owner: rec.owner_account ?? rec.owner,
       agentWallet: rec.agent_wallet ?? rec.agentWallet,
     };
   }

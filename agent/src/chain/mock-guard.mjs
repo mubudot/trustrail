@@ -1,10 +1,8 @@
 // In-memory stand-in for the deployed agent_spend_guard contract, with the same entrypoints,
 // error names and state transitions as contract/src/{admin,spend,views}.rs. Used for the mock
 // demo and the client tests; a live testnet adapter (planned, @concordium/web-sdk) will expose the same API.
-import { evaluate, dayOf, spentOn } from '../policy/engine.mjs';
+import { evaluate, dayOf, spentOn, validatePolicy } from '../policy/engine.mjs';
 import { GuardError } from '../policy/errors.mjs';
-
-const SETTLE_GRACE_MS = 10n * 60_000n;
 
 export class MockGuardChain {
   /** @param {{owner: string, cosigner?: string, clock?: () => number, escrowBalance?: bigint}} opts */
@@ -16,6 +14,7 @@ export class MockGuardChain {
     this.agents = new Map();
     this.generations = new Map();
     this.auths = new Map();
+    this.settledTxs = new Map();
     this.nextAuthId = 0n;
     this.escrowBalance = escrowBalance;
     this.escrowReserved = 0n;
@@ -40,25 +39,36 @@ export class MockGuardChain {
   }
 
   // ----------------------------------------------------------------- owner administration
-  registerAgent(sender, { agent, badge = null, policy, allowlist }) {
+  registerAgent(sender, { agent, wallet, badge = null, policy, allowlist }) {
     this.#owner(sender);
     if (this.agents.has(agent)) throw new GuardError('AlreadyRegistered');
-    if (policy.perTxCap <= 0n || policy.dailyCap < policy.perTxCap) throw new GuardError('InvalidPolicy');
-    if (new Set(allowlist).size !== allowlist.length) throw new GuardError('InvalidPolicy');
-    if (allowlist.length > 32) throw new GuardError('AllowlistTooLong');
+    const invalid = validatePolicy(policy, allowlist);
+    if (invalid) throw new GuardError(invalid);
+    if (!wallet || wallet === agent || wallet === this.owner || allowlist.includes(wallet)) throw new GuardError('InvalidWallet');
     const generation = (this.generations.get(agent) ?? 0n) + 1n;
     this.generations.set(agent, generation);
     this.agents.set(agent, {
-      badge, policy: { ...policy }, allowlist: [...allowlist], paused: false, generation,
+      badge, wallet, policy: { ...policy }, allowlist: [...allowlist], paused: false, generation,
       day: dayOf(this.#now()), spentToday: 0n, total: 0n,
     });
-    this.#emit('AgentRegistered', { agent, generation, badge });
+    this.#emit('AgentRegistered', { agent, wallet, generation, badge });
+  }
+
+  removeAgent(sender, agent) {
+    this.#owner(sender);
+    const rec = this.agents.get(agent);
+    if (!rec) throw new GuardError('NotAgent');
+    this.agents.delete(agent);
+    this.#emit('AgentRemoved', { agent, generation: rec.generation });
   }
 
   setAllowlist(sender, { agent, allowlist }) {
     this.#owner(sender);
     const rec = this.agents.get(agent);
     if (!rec) throw new GuardError('NotAgent');
+    const invalid = validatePolicy(rec.policy, allowlist);
+    if (invalid) throw new GuardError(invalid);
+    if (allowlist.includes(rec.wallet)) throw new GuardError('InvalidWallet');
     rec.allowlist = [...allowlist];
     this.#emit('AllowlistUpdated', { agent, allowlist });
   }
@@ -94,7 +104,7 @@ export class MockGuardChain {
     const id = this.nextAuthId++;
     const auth = {
       id, agent: sender, generation: rec.generation, payee, asset, amount, mode, purposeHash,
-      status, createdAt: now, expiresAt: now + rec.policy.authTtlMs, day: today, settlement: null,
+      status, createdAt: now, expiresAt: now + rec.policy.authTtlMs, day: today, commitment: null, settlement: null,
     };
     this.auths.set(id, auth);
     if (status === 'Pending' && mode === 'Escrow') this.escrowReserved += amount;
@@ -136,7 +146,7 @@ export class MockGuardChain {
 
   cancel(sender, id) {
     const auth = this.#auth(id);
-    if (sender !== this.owner && sender !== auth.agent) throw new GuardError('NotPermitted');
+    if (sender !== this.owner && sender !== auth.agent && sender !== this.cosigner) throw new GuardError('NotPermitted');
     if (auth.status !== 'Pending' && auth.status !== 'Approved') throw new GuardError('WrongStatus');
     if (auth.status === 'Pending' && auth.mode === 'Escrow') this.escrowReserved -= auth.amount;
     auth.status = 'Cancelled';
@@ -144,14 +154,30 @@ export class MockGuardChain {
     this.#emit('Cancelled', { id: auth.id, by: sender });
   }
 
+  /** Co-signer only: atomically consume an Approved authorisation for one transfer digest. */
+  commitPayment(sender, { id, digest }) {
+    if (sender !== this.cosigner) throw new GuardError('NotPermitted');
+    if (this.paused) throw new GuardError('Paused');
+    const auth = this.#auth(id);
+    if (auth.mode !== 'X402' || auth.status !== 'Approved') throw new GuardError('WrongStatus');
+    if (this.#now() >= auth.expiresAt) throw new GuardError('Expired');
+    const rec = this.agents.get(auth.agent);
+    if (!rec || rec.generation !== auth.generation) throw new GuardError('StaleGeneration');
+    if (rec.paused) throw new GuardError('AgentPaused');
+    if (!rec.allowlist.includes(auth.payee)) throw new GuardError('NotAllowlisted');
+    auth.status = 'Committed';
+    auth.commitment = digest;
+    this.#emit('PaymentCommitted', { id: auth.id, digest });
+  }
+
   recordSettlement(sender, { id, txHash }) {
     const auth = this.#auth(id);
     if (sender !== auth.agent && sender !== this.cosigner) throw new GuardError('NotPermitted');
-    if (auth.mode !== 'X402' || auth.status !== 'Approved') throw new GuardError('WrongStatus');
-    if (this.#now() >= auth.expiresAt + SETTLE_GRACE_MS) throw new GuardError('Expired');
-    if (this.agents.get(auth.agent)?.generation !== auth.generation) throw new GuardError('StaleGeneration');
+    if (auth.mode !== 'X402' || auth.status !== 'Committed') throw new GuardError('WrongStatus');
+    if (this.settledTxs.has(txHash)) throw new GuardError('DuplicateSettlement');
     auth.status = 'Settled';
     auth.settlement = txHash;
+    this.settledTxs.set(txHash, auth.id);
     this.#emit('Settled', { id: auth.id, txHash });
   }
 
