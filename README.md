@@ -88,9 +88,13 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
   wallet signatures in it to be valid signatures on the committed digest
   (`live/src/settlement-check.mjs`). A wrong hash recorded on chain is therefore detectable by
   anyone, but not prevented at record time.
-- **An audit anchor proves the log as of that anchor.** `verify` requires the latest anchor to
-  cover every entry of the submitted log, so a rewritten tail fails; but whoever holds an anchoring
-  key (owner, agent or co-signer) could anchor a rewritten log as a new head. On-chain guard events
+- **An audit anchor proves the log as of that anchor.** `verify` requires the anchor to cover
+  every entry of the submitted log (a rewritten tail fails), to postdate every demo transaction it
+  checks, and the log to mention every authorisation the guard holds on chain (ids are dense, so
+  `verify` counts them on chain). Presenting an older anchor with a truncated log therefore fails
+  without trusting `state/run.json`. What it cannot rule out: whoever holds an anchoring key
+  (owner, agent or co-signer) could anchor a rewritten log as a new head, and guard actions that
+  are not tied to an authorisation (such as `updatePolicy`) are not counted. On-chain guard events
   and authorisation records remain the independent trail.
 - **Escrow mode is not proof-gated.** Escrow approvals pay from the contract directly, without the
   co-signer; the demo and the human-approval claim use x402 mode only.
@@ -105,7 +109,7 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
 agent/               Offline reference client + mock chain (zero dependencies), 27 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 23 offline tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 29 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402

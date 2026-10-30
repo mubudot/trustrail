@@ -22,7 +22,7 @@
 ## Tests
 - contract: 9 unit + 18 integration (`cargo test`, after `scripts/build-wasm.sh`)
 - agent (offline reference client + mock chain): 27 (`npm test`)
-- live adapters (offline, fakes for chain): 23 (`npm test`)
+- live adapters (offline, fakes for chain): 29 (`npm test`)
 
 ## Changes in this round
 - Contract: `approve` now takes `{id, human_proof}` and stores the Verification Audit Record anchor

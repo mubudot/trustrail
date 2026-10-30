@@ -5,7 +5,8 @@
 // that replayed / missing proofs are not what the guard recorded as settled, the x402 settlement
 // transactions (sponsored, from the 2-of-2 wallet, to the badge-verified seller, signed over the
 // digest committed on chain), and that the
-// hash-chained audit log's head matches the AuditAnchored event on chain.
+// hash-chained audit log's head matches an AuditAnchored event on chain that postdates the run and
+// covers every authorisation the guard holds (live/src/audit-anchor.mjs).
 import fs from 'node:fs';
 import { AccountAddress, TransactionHash } from '@concordium/web-sdk';
 import { readOnlyTestnetClient, explorerTx, withRetry } from '../src/net.mjs';
@@ -13,7 +14,7 @@ import { deployedGuard } from '../src/guard-instance.mjs';
 import { readState } from '../src/state.mjs';
 import { enumTag, unOpt } from '../src/guard-client.mjs';
 import { checkApproval, approvalResourceId, approvalContextString } from '../src/human-approval.mjs';
-import { guardEventsOf, EVENT_TAGS } from '../src/guard-events.mjs';
+import { checkAuditAnchor } from '../src/audit-anchor.mjs';
 import { settlementMatchesCommitment } from '../src/settlement-check.mjs';
 import { AUDIT_FILE, loadApproval } from '../src/world.mjs';
 import { AuditLog } from '../../agent/src/audit/log.mjs';
@@ -128,17 +129,14 @@ const log = new AuditLog({ file: AUDIT_FILE });
 ok(AuditLog.verify(log.entries).ok, `audit log hash chain intact (${log.entries.length} entries)`);
 const anc = need('anchor');
 if (anc) {
-  // The anchor must cover the WHOLE submitted log (not a prefix that leaves later entries
-  // rewritable), come from our guard's AuditAnchored event, and be sent by an account the guard
-  // lets anchor (owner, registered agent, co-signer).
-  const ev = guardEventsOf(await tx(anc.txHash), guard.address.index).find((e) => e.tag === EVENT_TAGS.AuditAnchored);
-  const b = ev ? Buffer.from(ev.hex, 'hex') : Buffer.alloc(0);
-  const by = b.length >= 73 ? AccountAddress.fromBuffer(b.subarray(1, 33)).address : null;
-  const head = b.length >= 73 ? b.subarray(33, 65).toString('hex') : null;
-  const count = b.length >= 73 ? Number(b.readBigUInt64LE(65)) : -1;
-  const n = log.entries.length;
-  ok(!!ev && [st.guard.owner, st.guard.agent, st.guard.cosigner].includes(by) && count === n && head === log.entries[n - 1]?.hash,
-    `audit head of all ${n} entries matches AuditAnchored (count ${count}) on chain ${explorerTx(anc.txHash)}`);
+  // The anchor must cover the WHOLE submitted log, be sent by an account the guard lets anchor, and
+  // must not be an older anchor of a truncated log: the chain itself says how many authorisations
+  // exist (all must be in the log) and the anchor must postdate every demo transaction checked above.
+  const covered = run.steps.filter((s) => s.txHash && s.step !== 'anchor').map((s) => s.txHash);
+  const r = await checkAuditAnchor({ grpc, guard, anchorTxHash: anc.txHash, entries: log.entries,
+    allowedSenders: [st.guard.owner, st.guard.agent, st.guard.cosigner], coveredTxHashes: covered });
+  for (const why of r.reasons) console.log('   ', why);
+  ok(r.ok, `audit head of all ${log.entries.length} entries = AuditAnchored (count ${r.event?.count ?? '?'}), after the run, covers all ${r.onChainAuthCount} on-chain authorisations ${explorerTx(anc.txHash)}`);
 }
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exit(failures ? 1 : 0);
