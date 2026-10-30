@@ -19,7 +19,7 @@ the owner key can flip. TrustRail makes the human part *cryptographic and specif
    the credential of the account that owns this agent." No personal data is revealed.
 2. **The proof is bound to one payment.** The verification request is anchored on chain and names
    the guard, the authorisation id, the payee, the amount and the purpose hash. A valid proof for
-   payment #1 cannot approve payment #2 (we tried — [docs/TESTNET.md](docs/TESTNET.md), row 4).
+   one payment cannot approve another (we tried — [docs/TESTNET.md](docs/TESTNET.md), row 4).
 3. **Nothing pays without it.** The agent's paying wallet is a native Concordium **2-of-2** account.
    The agent holds key 0; a small deterministic co-signer holds key 1 and signs only a transfer that
    matches an approved on-chain authorisation *and* whose human-approval record re-verifies against
@@ -49,7 +49,7 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
 
 ## What stops what (all demonstrated on testnet)
 
-| The agent or a hijacker of the agent process tries to … | Stopped by |
+| The agent's logic misbehaves (prompt injection, a bug, skipped client checks) and tries to … | Stopped by |
 | --- | --- |
 | pay an address it was talked into | payee badge must be bound to `payTo` (`payee_not_bound_to_badge`); on-chain allowlist |
 | pay more than the per-payment / daily cap, even skipping the client | guard contract rejects on chain (`PerTxCap`, `DailyCap`) |
@@ -70,6 +70,13 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
   co-signer confirms after checking a proof) and a redeploy of the testnet instance (the module has
   no upgrade entrypoint). The human gate for payments is enforced by the co-signer, which pins its
   own threshold. Keep the owner and co-signer keys with different operators.
+- **In the demo the co-signer runs inside the agent's Node process.** `live/src/world.mjs` loads
+  both wallet keys into one process for convenience, so the demo shows an agent whose *logic* is
+  subverted (e.g. it skips its own preflight and calls the guard directly — row 6), not one whose
+  host is fully compromised. Someone with code execution in that process could read key 1 and sign
+  alone. In a real deployment the co-signer is a separate service (own host, own key store; the
+  owner or a custodian) that the agent reaches over an API; `LiveCosigner.cosign()` is already that
+  boundary (plain-JSON inputs, a signature or a refusal out).
 - **The co-signer is trusted to follow the rules.** Its key is half of the 2-of-2 wallet; if it is
   stolen together with the agent key, the wallet can be drained. It is deterministic, small and
   open source so it can be audited and run by the owner or a custodian.

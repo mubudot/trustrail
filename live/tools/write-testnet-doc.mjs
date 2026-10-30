@@ -34,14 +34,14 @@ const rows = [
   ['1', '0.5 CCD weather feed (under threshold)', `paid via x402. commitPayment ${L(s0.commitTx)} → **settlement ${L(s0.txHash)}** (sponsored by the facilitator, from the 2-of-2 wallet) → recordSettlement ${L(s0.recordTx)}`],
   ['2', '4 CCD dataset (above threshold)', `authorize → Pending ${L(r1.txHash)}. Verified-human approval: request anchored ${L(a1.requestTx)}, ZK proof (age ≥ 18 from the owner account's credential; no personal data) verified, audit record anchored ${L(a1.recordAnchorTx)}, owner approve(id, anchor hash) ${L(a1.approveTx)}. Co-signer re-verified the record → commit ${L(p1.commitTx)} → **settlement ${L(p1.txHash)}** → record ${L(p1.recordTx)}`],
   ['3', '4 CCD, owner key approves with a made-up proof hash', `contract accepted approve ${L(f.approveTx)}, but the **co-signer refused** (\`${fp.reason}\`) and cancelled it — the wallet can't pay without key 1`],
-  ['4', '4 CCD, owner approves with the *valid* proof of payment #1 (replay)', `approve ${L(rp.approveTx)}; proof and anchor verify, but they name authorisation #1 → **co-signer refused** (\`${rpp.reason}\`), cancelled ${L(rpp.cancelTx)}`],
+  ['4', '4 CCD, owner approves with the *valid* human proof of an earlier payment, authorisation #1 (replay)', `approve ${L(rp.approveTx)}; proof and anchor verify, but they name authorisation #1 → **co-signer refused** (\`${rpp.reason}\`), cancelled ${L(rpp.cancelTx)}`],
   ['5', '9 CCD bulk export', `refused by the local preflight (\`${oc.reason}\`), no transaction`],
   ['6', 'hijacked agent skips the preflight and calls authorize(9 CCD) itself', `**rejected on chain** (\`${typeof h.code === 'number' ? nameOf(h.code) : h.code}\`) ${L(h.txHash)}`],
   ['7', 'look-alike seller shows the real seller\'s badge but wants to be paid elsewhere', `refused before any transaction (\`${im.reason}\`: the badge's owner/wallet ≠ payTo)`],
   ['8', 'anchor the hash-chained audit log', `head of ${an.count} entries anchored ${L(an.txHash)} (\`AuditAnchored\` event on the guard)`],
 ];
 out.push('| # | Scenario | What happened on chain |', '| --- | --- | --- |', ...rows.map((r) => `| ${r.join(' | ')} |`));
-out.push('', 'The approval record of payment #2 is public at `live/state/approvals/auth-1.json` (a Concordium Verification Audit Record: request, presentation, ZK proof — no personal attributes). Its hash is stored in the guard authorisation (`human_proof`) and in the RegisterData anchor.', '',
+out.push('', `The approval record of payment #2 is public at \`live/state/approvals/auth-${a1.authId}.json\` (a Concordium Verification Audit Record: request, presentation, ZK proof — no personal attributes). Its hash is stored in the guard authorisation (\`human_proof\`) and in the RegisterData anchor.`, '',
   'Notes: identities are **testnet IdP test identities with dummy attributes** (no real ID documents). The seller and facilitator run locally during the demo (`live/demo/testnet.mjs`); their transactions are real testnet transactions. Agent Cards are served from a temporary demo host.');
 fs.writeFileSync(new URL('../../docs/TESTNET.md', import.meta.url), `${out.join('\n')}\n`);
 console.log('wrote docs/TESTNET.md');
