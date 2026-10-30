@@ -38,6 +38,8 @@ export async function createLiveWorld() {
     walletKey: acc.wallet.keys[1].privateKey, agentPublicKey: acc.wallet.keys[0].publicKey,
     agentAccount: acc.agent.address, owner: acc.owner.address,
     approvals: async (id) => loadApproval(id),
+    // Pinned from the co-signer's own record of the registered policy, not read live from chain.
+    humanProofAbove: BigInt(st.guard.policy.approval_threshold),
   });
   const audit = new AuditLog({ file: AUDIT_FILE });
   const facilitator = createFacilitator({ address: acc.facilitator.address, privateKey: acc.facilitator.keys[0].privateKey });

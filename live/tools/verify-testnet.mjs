@@ -3,7 +3,8 @@
 // Checks: both Agent Registry badges (hosted MCP), guard state of every demo authorisation, the
 // ZK "verified human approved this" record of the approved payment (re-verified against chain),
 // that replayed / missing proofs are not what the guard recorded as settled, the x402 settlement
-// transactions (sponsored, from the 2-of-2 wallet, to the badge-verified seller), and that the
+// transactions (sponsored, from the 2-of-2 wallet, to the badge-verified seller, signed over the
+// digest committed on chain), and that the
 // hash-chained audit log's head matches the AuditAnchored event on chain.
 import fs from 'node:fs';
 import { AccountAddress, TransactionHash } from '@concordium/web-sdk';
@@ -13,6 +14,7 @@ import { readState } from '../src/state.mjs';
 import { enumTag, unOpt } from '../src/guard-client.mjs';
 import { checkApproval, approvalResourceId, approvalContextString } from '../src/human-approval.mjs';
 import { guardEventsOf, EVENT_TAGS } from '../src/guard-events.mjs';
+import { settlementMatchesCommitment } from '../src/settlement-check.mjs';
 import { AUDIT_FILE, loadApproval } from '../src/world.mjs';
 import { AuditLog } from '../../agent/src/audit/log.mjs';
 import { nameOf } from '../../agent/src/policy/errors.mjs';
@@ -32,6 +34,9 @@ const me = await guard.agent(st.guard.agent);
 ok(unOpt(me.record.badge)?.token_id?.toString() === st.badges.buyer.tokenId, `guard binds the agent to badge #${st.badges.buyer.tokenId} (owner holds it — checked on chain at registration)`);
 
 ok(me.record.wallet === st.guard.wallet, `guard's registered wallet for the agent is ${st.guard.wallet}`);
+const onchainThr = BigInt(me.record.policy.approval_threshold);
+const pinnedThr = BigInt(st.guard.policy.approval_threshold);
+ok(onchainThr <= pinnedThr, `on-chain approval threshold ${onchainThr} microCCD <= co-signer's pinned threshold ${pinnedThr} (a raise by the owner key alone would not switch off the human check)`);
 const wi = await grpc.getAccountInfo(AccountAddress.fromBase58(st.guard.wallet));
 const creds = Object.values(wi.accountCredentials);
 const cpk = creds[0].value.contents.credentialPublicKeys;
@@ -51,6 +56,8 @@ for (const p of paid) {
   const addr = (x) => String(x?.address ?? x);
   ok(addr(s.sender) === st.guard.wallet && s.sponsor?.sponsor && addr(s.transfer?.to) === st.badges.seller.holder && BigInt(s.transfer.amount.microCcdAmount ?? s.transfer.amount) === BigInt(a.amount),
     `  settlement is a sponsored transfer of ${a.amount} microCCD from the 2-of-2 wallet to the badge-verified seller`);
+  ok(await settlementMatchesCommitment(grpc, { txHash: p.txHash, commitment: unOpt(a.commitment), walletPublicKeys: st.guard.walletPublicKeys }),
+    `  the settled transaction is the committed one: both wallet signatures in it are on the digest stored by commitPayment`);
   const proof = unOpt(a.human_proof);
   if (BigInt(a.amount) > BigInt(me.record.policy.approval_threshold)) {
     const ap = loadApproval(p.authId);

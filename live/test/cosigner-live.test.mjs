@@ -8,14 +8,14 @@ import { A, FakeGuard, auth, record, fakeGrpc, requirements, walletKeys } from '
 
 const URL_ = 'http://127.0.0.1:4402/dataset';
 
-async function setup({ authOver = {}, recOver = {}, reqAmount = '4000000', approvalOk = true, approvals = true } = {}) {
+async function setup({ authOver = {}, recOver = {}, reqAmount = '4000000', approvalOk = true, approvals = true, humanProofAbove } = {}) {
   const k = walletKeys();
   const req = requirements(reqAmount);
   const guard = new FakeGuard({ auth: auth({ purpose_hash: purposeHash(URL_, requirements()), ...authOver }), record: record(recOver) });
   const checked = [];
   const cos = new LiveCosigner({
     guard, account: { address: A.cosigner, signer: null }, walletKey: k.cosigner.privateKey, agentPublicKey: k.agent.publicKey,
-    agentAccount: A.agent, owner: A.owner,
+    agentAccount: A.agent, owner: A.owner, humanProofAbove,
     approvals: async () => (approvals ? { record: {}, anchorTx: 'aa'.repeat(32) } : null),
     checkApproval: async (args) => { checked.push(args); if (!approvalOk) throw new Error('approval_wrong_resource: other payment'); return true; },
   });
@@ -119,4 +119,24 @@ test('refuses a wallet alias as sponsor, a sponsor other than the offer fee paye
   const s4 = await mk();
   s4.guard.grpc = { getNextAccountNonce: async () => ({ nonce: SequenceNumber.create(8n) }) };
   assert.equal(await refusal(s4.cos.cosign({ authId: 1n, signableJSON: toJSON(s4.tx), resourceUrl: URL_, requirements: requirements() })), 'tx_nonce_not_next');
+});
+
+test('owner key alone raising the on-chain threshold does not switch off the human check (pinned threshold)', async () => {
+  // updatePolicy raised approval_threshold to 10 CCD, so the guard authorised 4 CCD without Pending/approve.
+  const raised = { authOver: { human_proof: { None: [] } }, recOver: { policy: { ...record().policy, approval_threshold: 10000000n } } };
+  const s1 = await setup({ ...raised, humanProofAbove: 2000000n });
+  assert.equal(await refusal(s1.cos.cosign({ authId: 1n, signableJSON: toJSON(s1.tx), resourceUrl: URL_, requirements: requirements() })), 'human_approval_missing_pinned_threshold');
+  assert.equal(s1.guard.sent.length, 0, 'nothing committed');
+  // Without a pinned threshold the raised on-chain value would have been enough (documents the gap it closes).
+  const s2 = await setup(raised);
+  assert.notEqual(await refusal(s2.cos.cosign({ authId: 1n, signableJSON: toJSON(s2.tx), resourceUrl: URL_, requirements: requirements() })), 'human_approval_missing_pinned_threshold');
+});
+
+test('pinned threshold: amounts at or below it still need no proof; above it a verified proof still signs', async () => {
+  const small = await setup({ reqAmount: '2000000', authOver: { amount: 2000000n, human_proof: { None: [] } }, humanProofAbove: 2000000n });
+  assert.match(await small.cos.cosign({ authId: 0n, signableJSON: toJSON(small.tx), resourceUrl: URL_, requirements: requirements() }), /^[0-9a-f]{128}$/);
+  const ok = await setup({ humanProofAbove: 2000000n });
+  const sig = await ok.cos.cosign({ authId: 1n, signableJSON: toJSON(ok.tx), resourceUrl: URL_, requirements: requirements() });
+  assert.ok(sig);
+  assert.equal(ok.checked.length, 1, 'proof verified');
 });

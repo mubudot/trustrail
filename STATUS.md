@@ -17,12 +17,12 @@
 - Demo run (`demo/testnet.mjs`): two real x402 payments (0.5 CCD auto, 4 CCD after a ZK human
   approval), forged-proof and replayed-proof approvals refused by the co-signer, preflight and
   on-chain cap refusals, badge-impostor refusal, audit head anchored.
-- `npm run verify` (read-only) re-checks all of it: 15 checks pass.
+- `npm run verify` (read-only) re-checks all of it: 20 checks pass.
 
 ## Tests
 - contract: 9 unit + 18 integration (`cargo test`, after `scripts/build-wasm.sh`)
 - agent (offline reference client + mock chain): 27 (`npm test`)
-- live adapters (offline, fakes for chain): 17 (`npm test`)
+- live adapters (offline, fakes for chain): 23 (`npm test`)
 
 ## Changes in this round
 - Contract: `approve` now takes `{id, human_proof}` and stores the Verification Audit Record anchor

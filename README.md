@@ -23,7 +23,8 @@ the owner key can flip. TrustRail makes the human part *cryptographic and specif
 3. **Nothing pays without it.** The agent's paying wallet is a native Concordium **2-of-2** account.
    The agent holds key 0; a small deterministic co-signer holds key 1 and signs only a transfer that
    matches an approved on-chain authorisation *and* whose human-approval record re-verifies against
-   the chain. Owner key alone + made-up proof → no payment (row 3).
+   the chain. Owner key alone + made-up proof → no payment (row 3). (What the owner key *can* do is
+   listed below.)
 4. **Afterwards anyone can audit it.** The Verification Audit Record's hash sits in the guard's
    authorisation (`human_proof`) and in a RegisterData anchor; the agent's hash-chained audit log
    head is anchored with `anchorAudit`. That is an EU AI Act Art. 12-style record with a lawful
@@ -48,14 +49,42 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
 
 ## What stops what (all demonstrated on testnet)
 
-| The agent, a hijacker, or a compromised owner key tries to … | Stopped by |
+| The agent or a hijacker of the agent process tries to … | Stopped by |
 | --- | --- |
 | pay an address it was talked into | payee badge must be bound to `payTo` (`payee_not_bound_to_badge`); on-chain allowlist |
 | pay more than the per-payment / daily cap, even skipping the client | guard contract rejects on chain (`PerTxCap`, `DailyCap`) |
 | make a large payment without a human | Pending until approved; the co-signer needs a verifying ZK approval record |
-| approve with the owner key and a fake or replayed proof | co-signer re-verifies proof, credential owner, resource id and anchor hash → refuses and cancels |
-| pay twice from one approval / change the transfer after approval | `commitPayment` stores the exact sign-hash once; co-signer signs only that |
+| pay twice from one approval / change the transfer after approval | `commitPayment` stores the exact sign-hash once; co-signer signs only that; `verify` checks the settled transaction was signed over that hash |
 | quietly rewrite history | guard events + authorisation records; ZK audit records anchored; audit-log head anchored |
+
+| Someone holding **only the owner key** tries to … | What happens |
+| --- | --- |
+| approve a large payment with a fake or replayed proof | co-signer re-verifies proof, credential owner, resource id, payment details and anchor hash → refuses and cancels (rows 3–4 in [docs/TESTNET.md](docs/TESTNET.md)) |
+| raise `approval_threshold` with `updatePolicy` so large payments skip `Pending` | **the contract accepts it** — the owner key alone can change the policy. The co-signer keeps its own pinned threshold (`humanProofAbove`, set from the registered policy) and still demands a verified-human proof above it, so such payments fail closed (`human_approval_missing_pinned_threshold`). `npm run verify` checks the on-chain threshold is not above the pinned one. |
+| raise caps, add an allowlisted payee, pause/unpause, withdraw escrow | allowed: the owner key is the policy administrator. Large x402 payments still need the human proof (above). |
+
+## Trust assumptions and known limitations
+
+- **The owner key is trusted as policy administrator.** The contract cannot verify ZK proofs, so it
+  cannot require one for `updatePolicy`; changing that would need a new two-step (owner proposes,
+  co-signer confirms after checking a proof) and a redeploy of the testnet instance (the module has
+  no upgrade entrypoint). The human gate for payments is enforced by the co-signer, which pins its
+  own threshold. Keep the owner and co-signer keys with different operators.
+- **The co-signer is trusted to follow the rules.** Its key is half of the 2-of-2 wallet; if it is
+  stolen together with the agent key, the wallet can be drained. It is deterministic, small and
+  open source so it can be audited and run by the owner or a custodian.
+- **The contract does not check the settlement against the commitment.** `commitPayment` stores
+  the sign-hash the co-signer signed, but `recordSettlement` accepts the transaction hash the agent
+  or co-signer reports: a contract cannot read other transactions, and the high-level web-sdk
+  client only returns transaction summaries. The check is done off chain instead: `npm run verify`
+  fetches the finalized settlement through the raw gRPC `GetBlockItems` stream and requires both
+  wallet signatures in it to be valid signatures on the committed digest
+  (`live/src/settlement-check.mjs`). A wrong hash recorded on chain is therefore detectable by
+  anyone, but not prevented at record time.
+- **Escrow mode is not proof-gated.** Escrow approvals pay from the contract directly, without the
+  co-signer; the demo and the human-approval claim use x402 mode only.
+- The approval proof is made by a script holding the owner's testnet seed. In production the owner's
+  Concordium ID app answers the anchored request (same V1 format).
 
 ## Layout
 
@@ -65,7 +94,7 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
 agent/               Offline reference client + mock chain (zero dependencies), 27 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 17 offline tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 23 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402

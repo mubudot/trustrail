@@ -31,6 +31,9 @@ export class LiveCosigner {
    * @param o.agentAccount the agent's control account
    * @param o.owner the guard owner account
    * @param o.approvals (authId) => {record, anchorTx} | null   — where approval records are kept
+   * @param o.humanProofAbove (bigint, optional) the co-signer's OWN pinned approval threshold. Above
+   *   it a verified-human proof is required even if the owner has raised the on-chain threshold with
+   *   updatePolicy: the owner key alone cannot switch the human check off.
    */
   constructor(o) { Object.assign(this, { clock: () => Date.now(), checkApproval: checkApprovalOnChain, ...o }); }
 
@@ -53,8 +56,10 @@ export class LiveCosigner {
     // Human approval: required for every authorisation above the threshold (those went through
     // Pending -> approve, which stores the anchor hash). Verify the record, not just its presence.
     const humanProof = unOpt(a.human_proof);
-    const needsHuman = BigInt(a.amount) > BigInt(rec.policy.approval_threshold);
-    if (needsHuman && !humanProof) no('human_approval_missing');
+    const amount = BigInt(a.amount);
+    const abovePinned = this.humanProofAbove !== undefined && amount > BigInt(this.humanProofAbove);
+    const needsHuman = amount > BigInt(rec.policy.approval_threshold) || abovePinned;
+    if (needsHuman && !humanProof) no(abovePinned && amount <= BigInt(rec.policy.approval_threshold) ? 'human_approval_missing_pinned_threshold' : 'human_approval_missing');
     if (humanProof) {
       const ap = await this.approvals(authId);
       if (!ap) no('human_approval_record_unavailable');
