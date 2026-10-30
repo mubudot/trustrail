@@ -1,0 +1,5 @@
+# wasm32v1-none = Wasm MVP only (what the Concordium chain accepts); same target cargo-concordium 5 uses.
+[toolchain]
+channel = "1.99.1"
+targets = ["wasm32v1-none"]
+profile = "minimal"

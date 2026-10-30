@@ -1,0 +1,22 @@
+{
+  "about": "Shared test vectors for the spending policy. Run by contract/src/unit_tests.rs (Rust) and agent/test/policy.test.mjs (JS) so the on-chain rule and the client preflight cannot drift. Accounts are indices (account i = 32 bytes of value i).",
+  "base_agent": { "paused": false, "asset": "CCD", "per_tx_cap": 100, "daily_cap": 250, "approval_threshold": 50, "allowlist": [2], "day": 10, "spent_today": 0 },
+  "vectors": [
+    { "name": "approve at threshold", "payee": 2, "amount": 50, "expect": "Approve" },
+    { "name": "needs approval above threshold", "payee": 2, "amount": 51, "expect": "NeedsApproval" },
+    { "name": "contract paused wins", "contract_paused": true, "payee": 3, "amount": 0, "expect": "Paused" },
+    { "name": "unknown agent", "agent": null, "payee": 2, "amount": 1, "expect": "NotAgent" },
+    { "name": "agent paused", "agent_patch": { "paused": true }, "payee": 2, "amount": 1, "expect": "AgentPaused" },
+    { "name": "asset mismatch", "asset": "PLT:EURR", "payee": 2, "amount": 1, "expect": "AssetMismatch" },
+    { "name": "escrow needs CCD", "agent_patch": { "asset": "PLT:EURR" }, "asset": "PLT:EURR", "mode": "Escrow", "payee": 2, "amount": 1, "expect": "EscrowOnlyCcd" },
+    { "name": "plt via x402 ok", "agent_patch": { "asset": "PLT:EURR" }, "asset": "PLT:EURR", "payee": 2, "amount": 1, "expect": "Approve" },
+    { "name": "zero amount", "payee": 2, "amount": 0, "expect": "ZeroAmount" },
+    { "name": "not allowlisted", "payee": 3, "amount": 1, "expect": "NotAllowlisted" },
+    { "name": "allowlist checked before per-tx cap", "payee": 3, "amount": 101, "expect": "NotAllowlisted" },
+    { "name": "per-tx cap", "payee": 2, "amount": 101, "expect": "PerTxCap" },
+    { "name": "daily cap boundary ok", "agent_patch": { "spent_today": 200 }, "payee": 2, "amount": 50, "expect": "Approve" },
+    { "name": "daily cap exceeded", "agent_patch": { "spent_today": 200 }, "payee": 2, "amount": 51, "expect": "DailyCap" },
+    { "name": "daily counter resets next day", "agent_patch": { "spent_today": 200 }, "today": 11, "payee": 2, "amount": 51, "expect": "NeedsApproval" },
+    { "name": "empty allowlist pays nobody", "agent_patch": { "allowlist": [] }, "payee": 2, "amount": 1, "expect": "NotAllowlisted" }
+  ]
+}

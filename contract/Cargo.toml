@@ -1,0 +1,29 @@
+[package]
+name = "agent_spend_guard"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Concordium smart contract: deterministic spending guardrail for AI agents (caps, allowlist, human approval, audit events)"
+
+[features]
+default = []
+wasm-test = ["concordium-std/wasm-test"]
+# Adds a minimal CIS-2 "registry" contract used ONLY by the integration tests. Never deploy.
+mock-registry = []
+bump_alloc = ["concordium-std/bump_alloc"]
+
+[dependencies]
+concordium-std = "11.0"
+concordium-cis2 = "7.0"
+
+[dev-dependencies]
+concordium-smart-contract-testing = "5.0"
+serde_json = "1"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+panic = "abort"

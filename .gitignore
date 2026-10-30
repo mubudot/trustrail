@@ -1,0 +1,12 @@
+/contract/target/
+/target/
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+*.export
+/keys/
+/.tmp/
+codex_*
+/build/
