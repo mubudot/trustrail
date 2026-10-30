@@ -89,14 +89,17 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
   (`live/src/settlement-check.mjs`). A wrong hash recorded on chain is therefore detectable by
   anyone, but not prevented at record time.
 - **An audit anchor proves the log as of that anchor.** `verify` requires the anchor to cover
-  every entry of the submitted log (a rewritten tail fails) and to postdate every settlement and
-  every transaction the log names. It also reads from chain how many authorisations the guard holds
-  (`next_auth_id`) and each one's current status, and requires the log to record that lifecycle
-  (authorised; approved if a proof is set; co-signed if committed; settled with the exact on-chain
-  settlement hash; refused if cancelled or rejected). Presenting an older anchor with a truncated log
-  therefore fails without trusting `state/run.json`, and a failed chain read fails the check. What
-  it cannot rule out: whoever holds an anchoring key (owner, agent or co-signer) could anchor a
-  rewritten log as a new head, and log entries that leave no on-chain trace (requests, quotes,
+  every entry of the submitted log (a rewritten tail fails), and every transaction the log or
+  `state/run.json` names, plus every on-chain settlement, to be finalized at or before the anchor.
+  For payments it also reads from chain how many authorisations the guard holds (`next_auth_id`)
+  and each one's current status, and requires the log to record that lifecycle (authorised;
+  approved if a proof is set; co-signed if committed; settled with the exact on-chain settlement
+  hash; refused if cancelled or rejected). Presenting an older anchor with a log truncated before a
+  payment step therefore fails without trusting `state/run.json`, and a failed chain read fails the
+  check. What it does not cover: administrative guard actions (`updatePolicy`, `setPaused`, agent
+  registration) are not reconciled against the log, so a log truncated only after such an action
+  can still match an older anchor; whoever holds an anchoring key (owner, agent or co-signer) could
+  anchor a rewritten log as a new head; and entries that leave no on-chain trace (requests, quotes,
   local preflight refusals) are only as good as that anchor. On-chain guard events and
   authorisation records remain the independent trail.
 - **Escrow mode is not proof-gated.** Escrow approvals pay from the contract directly, without the
@@ -112,7 +115,7 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
 agent/               Offline reference client + mock chain (zero dependencies), 27 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 32 offline tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 34 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402

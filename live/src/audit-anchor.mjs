@@ -10,8 +10,8 @@
 //     the log must record its CURRENT on-chain lifecycle: authorised; approved when a human_proof
 //     is set; co-signed when a commitment is set; settled with the exact on-chain settlement hash;
 //     refused when it was cancelled or rejected;
-//  2. the anchor must be in a block at or after the on-chain settlements and every transaction the
-//     log itself names (authorize / approve / commit / record txs), plus any extra covered txs.
+//  2. every transaction the log or run.json names (any `txHash` / `*Tx` field) and every on-chain
+//     settlement must be finalized at or before the anchor's block; unknown hashes fail.
 // Any lookup error propagates: a failed read never counts as "absent".
 import { AccountAddress, BlockHash, TransactionHash } from '@concordium/web-sdk';
 import { guardEventsOf, EVENT_TAGS } from './guard-events.mjs';
@@ -61,20 +61,30 @@ export function lifecycleGaps(auth, entries) {
   return gaps;
 }
 
-/** Every transaction hash the log itself names (these must all be older than the anchor). */
-export function txHashesInLog(entries) {
+/** A field holds a transaction hash when it is named `txHash` or ends in `Tx` (e.g. approveTx, cancelTx, recordAnchorTx). */
+const isTxField = (k) => k === 'txHash' || /Tx$/.test(k);
+
+/** Every transaction hash named by a list of records (log entries' `data`, or run.json steps). Malformed values are kept so they fail the height check. */
+export function txHashesIn(records) {
   const out = new Set();
-  for (const e of entries) for (const k of ['txHash', 'approveTx', 'commitTx', 'recordTx']) {
-    const v = e?.data?.[k];
-    if (typeof v === 'string' && /^[0-9a-f]{64}$/i.test(v)) out.add(v.toLowerCase());
+  for (const r of records) for (const [k, v] of Object.entries(r ?? {})) {
+    if (isTxField(k) && v !== null && v !== undefined && v !== '') out.add(String(v).toLowerCase());
   }
   return [...out];
 }
 
-/** Block height of a finalized transaction (null if unknown). */
+/** Every transaction hash the log itself names. */
+export const txHashesInLog = (entries) => txHashesIn(entries.map((e) => e?.data));
+
+/** Block height of a FINALIZED transaction, or null when it is unknown, not finalized, or not a valid hash. */
 export async function txHeight(grpc, txHash) {
-  const st = await grpc.getBlockItemStatus(TransactionHash.fromHexString(txHash));
-  const bh = st?.outcome?.blockHash;
+  if (!/^[0-9a-f]{64}$/i.test(String(txHash))) return null;
+  let st;
+  try { st = await grpc.getBlockItemStatus(TransactionHash.fromHexString(txHash)); } catch (e) {
+    if (/not ?found/i.test(String(e?.message ?? e))) return null;
+    throw e; // transient read errors fail the run instead of passing silently
+  }
+  const bh = st?.status === 'finalized' ? st?.outcome?.blockHash : null;
   if (!bh) return null;
   const info = await grpc.getBlockInfo(typeof bh === 'string' ? BlockHash.fromHexString(bh) : bh);
   return BigInt(info.blockHeight);
@@ -104,6 +114,7 @@ export function judgeAnchor({ event, allowedSenders, entries, onChainAuths, anch
 
 /** Gather the on-chain facts for one anchor transaction and judge it. Read errors propagate. */
 export async function checkAuditAnchor({ grpc, guard, anchorTxHash, entries, allowedSenders, coveredTxHashes = [] }) {
+  // coveredTxHashes: extra transactions (e.g. every *Tx / txHash field of run.json) that must be finalized at or before the anchor.
   const st = await grpc.getBlockItemStatus(TransactionHash.fromHexString(anchorTxHash));
   const ev = guardEventsOf(st?.outcome?.summary ?? {}, guard.address.index).find((e) => e.tag === EVENT_TAGS.AuditAnchored);
   const event = ev ? decodeAuditAnchored(ev.hex) : null;

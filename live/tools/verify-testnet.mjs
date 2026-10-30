@@ -14,7 +14,7 @@ import { deployedGuard } from '../src/guard-instance.mjs';
 import { readState } from '../src/state.mjs';
 import { enumTag, unOpt } from '../src/guard-client.mjs';
 import { checkApproval, approvalResourceId, approvalContextString } from '../src/human-approval.mjs';
-import { checkAuditAnchor } from '../src/audit-anchor.mjs';
+import { checkAuditAnchor, txHashesIn } from '../src/audit-anchor.mjs';
 import { settlementMatchesCommitment } from '../src/settlement-check.mjs';
 import { AUDIT_FILE, loadApproval } from '../src/world.mjs';
 import { AuditLog } from '../../agent/src/audit/log.mjs';
@@ -133,7 +133,7 @@ if (anc) {
   // must not be an older anchor of a truncated log: the chain itself (next_auth_id and each
   // authorisation's status) says what the log must record, and the anchor must postdate every
   // settlement and every transaction the log or run.json names (live/src/audit-anchor.mjs).
-  const covered = run.steps.filter((s) => s.txHash && s.step !== 'anchor').map((s) => s.txHash);
+  const covered = txHashesIn(run.steps);
   const r = await checkAuditAnchor({ grpc, guard, anchorTxHash: anc.txHash, entries: log.entries,
     allowedSenders: [st.guard.owner, st.guard.agent, st.guard.cosigner], coveredTxHashes: covered });
   for (const why of r.reasons) console.log('   ', why);

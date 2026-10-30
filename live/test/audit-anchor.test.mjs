@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AccountAddress } from '@concordium/web-sdk';
-import { decodeAuditAnchored, judgeAnchor, readOnChainAuthorizations, lifecycleGaps, txHashesInLog, ANCHOR_EVENT_LEN } from '../src/audit-anchor.mjs';
+import { decodeAuditAnchored, judgeAnchor, readOnChainAuthorizations, lifecycleGaps, txHashesInLog, txHashesIn, txHeight, ANCHOR_EVENT_LEN } from '../src/audit-anchor.mjs';
 import { EVENT_TAGS } from '../src/guard-events.mjs';
 
 const OWNER = '4quNUwSZDXiz2zb6jGQ8ytj6UX3ASqwyoBt4owTc5k9h6mMnMU';
@@ -93,4 +93,22 @@ test('on-chain authorisations come from next_auth_id; read errors and gaps throw
 test('log tx hashes are collected for the height check', () => {
   assert.deepEqual(txHashesInLog(lifecycle).sort(), [h(100), SETTLE0, h(101), h(102), h(103), h(104)].sort());
   assert.deepEqual(lifecycleGaps(chain[2], lifecycle), []);
+});
+
+test('every txHash / *Tx field counts (cancelTx, requestTx, anchorTx, recordAnchorTx), data hashes do not', () => {
+  const steps = [{ step: 'replay-pay', cancelTx: h(1), requestTx: h(2), anchorHash: h(3), recordAnchorTx: h(4) }, { step: 'anchor', txHash: h(5), head: h(6) }, { approveTx: 'not-a-hash' }];
+  assert.deepEqual(txHashesIn(steps).sort(), [h(1), h(2), h(4), h(5), 'not-a-hash'].sort());
+  assert.ok(txHashesInLog([{ data: { anchorTx: h(7) } }]).includes(h(7)));
+});
+
+test('txHeight: only finalized, known, well-formed transactions have a height; transient errors throw', async () => {
+  const grpc = (status, err) => ({
+    getBlockItemStatus: async () => { if (err) throw new Error(err); return { status, outcome: { blockHash: 'ab'.repeat(32) } }; },
+    getBlockInfo: async () => ({ blockHeight: 42n }),
+  });
+  assert.equal(await txHeight(grpc('finalized'), h(1)), 42n);
+  assert.equal(await txHeight(grpc('committed'), h(1)), null);
+  assert.equal(await txHeight(grpc('finalized', 'transaction not found.'), h(1)), null);
+  assert.equal(await txHeight(grpc('finalized'), 'not-a-hash'), null);
+  await assert.rejects(txHeight(grpc('finalized', '14 UNAVAILABLE: upstream'), h(1)), /UNAVAILABLE/);
 });
