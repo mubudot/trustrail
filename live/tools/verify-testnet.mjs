@@ -6,7 +6,7 @@
 // transactions (sponsored, from the 2-of-2 wallet, to the badge-verified seller, signed over the
 // digest committed on chain), and that the
 // hash-chained audit log's head matches an AuditAnchored event on chain that postdates the run and
-// covers every authorisation the guard holds (live/src/audit-anchor.mjs).
+// records the current lifecycle of every authorisation the guard holds (live/src/audit-anchor.mjs).
 import fs from 'node:fs';
 import { AccountAddress, TransactionHash } from '@concordium/web-sdk';
 import { readOnlyTestnetClient, explorerTx, withRetry } from '../src/net.mjs';
@@ -130,13 +130,14 @@ ok(AuditLog.verify(log.entries).ok, `audit log hash chain intact (${log.entries.
 const anc = need('anchor');
 if (anc) {
   // The anchor must cover the WHOLE submitted log, be sent by an account the guard lets anchor, and
-  // must not be an older anchor of a truncated log: the chain itself says how many authorisations
-  // exist (all must be in the log) and the anchor must postdate every demo transaction checked above.
+  // must not be an older anchor of a truncated log: the chain itself (next_auth_id and each
+  // authorisation's status) says what the log must record, and the anchor must postdate every
+  // settlement and every transaction the log or run.json names (live/src/audit-anchor.mjs).
   const covered = run.steps.filter((s) => s.txHash && s.step !== 'anchor').map((s) => s.txHash);
   const r = await checkAuditAnchor({ grpc, guard, anchorTxHash: anc.txHash, entries: log.entries,
     allowedSenders: [st.guard.owner, st.guard.agent, st.guard.cosigner], coveredTxHashes: covered });
   for (const why of r.reasons) console.log('   ', why);
-  ok(r.ok, `audit head of all ${log.entries.length} entries = AuditAnchored (count ${r.event?.count ?? '?'}), after the run, covers all ${r.onChainAuthCount} on-chain authorisations ${explorerTx(anc.txHash)}`);
+  ok(r.ok, `audit head of all ${log.entries.length} entries = AuditAnchored (count ${r.event?.count ?? '?'}), after the run, matches all ${r.onChainAuthCount} on-chain authorisations ${explorerTx(anc.txHash)}`);
 }
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exit(failures ? 1 : 0);
