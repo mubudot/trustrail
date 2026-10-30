@@ -8,7 +8,7 @@
 // hash-chained audit log's head matches the AuditAnchored event on chain.
 import fs from 'node:fs';
 import { AccountAddress, TransactionHash } from '@concordium/web-sdk';
-import { testnetClient, explorerTx } from '../src/net.mjs';
+import { readOnlyTestnetClient, explorerTx, withRetry } from '../src/net.mjs';
 import { deployedGuard } from '../src/guard-instance.mjs';
 import { readState } from '../src/state.mjs';
 import { enumTag, unOpt } from '../src/guard-client.mjs';
@@ -21,13 +21,13 @@ import { nameOf } from '../../agent/src/policy/errors.mjs';
 
 const st = readState();
 const run = JSON.parse(fs.readFileSync(new URL('../state/run.json', import.meta.url), 'utf8'));
-const grpc = testnetClient();
+const grpc = readOnlyTestnetClient();
 const guard = deployedGuard(grpc);
 let failures = 0;
 const ok = (cond, msg) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${msg}`); if (!cond) failures++; };
 
 for (const [which, b] of Object.entries(st.badges)) {
-  const j = await (await fetch(`https://agent-registry-mcp.concordium.com/v1/check-badge/${b.tokenAddress}`)).json();
+  const j = await withRetry(async () => { const r = await fetch(`https://agent-registry-mcp.concordium.com/v1/check-badge/${b.tokenAddress}`); if (r.status >= 500) throw new Error(`HTTP ${r.status}`); return r.json(); });
   ok(j.badge_valid === true && j.on_chain?.status === 'Active' && j.on_chain?.owner_account === b.holder, `${which} badge ${b.tokenAddress} valid, Active, owned by ${b.holder}`);
 }
 const me = await guard.agent(st.guard.agent);

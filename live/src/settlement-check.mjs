@@ -8,11 +8,16 @@
 // transfer with the same fields.
 import { BlockHash, TransactionHash } from '@concordium/web-sdk';
 import { verifyDigestWithKey } from './keys.mjs';
+import { withRetry } from './net.mjs';
 
 const hex = (b) => Buffer.from(b).toString('hex');
 
 /** Signatures of credential 0 of the sender of block item `txHash` ({keyIndex: sigHex}), or null. */
-export async function senderSignaturesOf(grpc, txHash) {
+export function senderSignaturesOf(grpc, txHash) {
+  return withRetry(() => readSenderSignatures(grpc, txHash));
+}
+
+async function readSenderSignatures(grpc, txHash) {
   const status = await grpc.getBlockItemStatus(TransactionHash.fromHexString(txHash));
   if (status.status !== 'finalized') return null;
   const blockHash = status.outcome.blockHash;
