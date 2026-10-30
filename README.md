@@ -88,6 +88,10 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
   wallet signatures in it to be valid signatures on the committed digest
   (`live/src/settlement-check.mjs`). A wrong hash recorded on chain is therefore detectable by
   anyone, but not prevented at record time.
+- **An audit anchor proves the log as of that anchor.** `verify` requires the latest anchor to
+  cover every entry of the submitted log, so a rewritten tail fails; but whoever holds an anchoring
+  key (owner, agent or co-signer) could anchor a rewritten log as a new head. On-chain guard events
+  and authorisation records remain the independent trail.
 - **Escrow mode is not proof-gated.** Escrow approvals pay from the contract directly, without the
   co-signer; the demo and the human-approval claim use x402 mode only.
 - The approval proof is made by a script holding the owner's testnet seed. In production the owner's

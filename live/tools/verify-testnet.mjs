@@ -128,11 +128,17 @@ const log = new AuditLog({ file: AUDIT_FILE });
 ok(AuditLog.verify(log.entries).ok, `audit log hash chain intact (${log.entries.length} entries)`);
 const anc = need('anchor');
 if (anc) {
+  // The anchor must cover the WHOLE submitted log (not a prefix that leaves later entries
+  // rewritable), come from our guard's AuditAnchored event, and be sent by an account the guard
+  // lets anchor (owner, registered agent, co-signer).
   const ev = guardEventsOf(await tx(anc.txHash), guard.address.index).find((e) => e.tag === EVENT_TAGS.AuditAnchored);
-  const b = Buffer.from(ev.hex, 'hex');
-  const head = b.subarray(33, 65).toString('hex');
-  const count = Number(b.readBigUInt64LE(65));
-  ok(head === log.entries[count - 1]?.hash, `audit head of entry ${count} matches AuditAnchored on chain ${explorerTx(anc.txHash)}`);
+  const b = ev ? Buffer.from(ev.hex, 'hex') : Buffer.alloc(0);
+  const by = b.length >= 73 ? AccountAddress.fromBuffer(b.subarray(1, 33)).address : null;
+  const head = b.length >= 73 ? b.subarray(33, 65).toString('hex') : null;
+  const count = b.length >= 73 ? Number(b.readBigUInt64LE(65)) : -1;
+  const n = log.entries.length;
+  ok(!!ev && [st.guard.owner, st.guard.agent, st.guard.cosigner].includes(by) && count === n && head === log.entries[n - 1]?.hash,
+    `audit head of all ${n} entries matches AuditAnchored (count ${count}) on chain ${explorerTx(anc.txHash)}`);
 }
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exit(failures ? 1 : 0);
