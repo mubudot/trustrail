@@ -98,21 +98,21 @@ description of what you plan to build. It does not need to be finished.
   holds no keys; builders return sign-ready payloads.
 - x402 testnet network id `ccd:4221332d34e1694168c2a0c0b3fd0f27`; gRPC `grpc.testnet.concordium.com:20000`.
 
-## Exactly what the user must do (Hark cannot)
+## Status and what the user must do (updated 2026-10-31)
 
-1. **Encode Club account + apply**: "Sign in to Apply" on the programme page. Sign-up details are not
-   shown before login; the page publishes **no KYC** for applying. (Hark can do the sign-up with the
-   usual hackathon email if you approve; nothing has been registered.)
-2. **Checkpoint 1** (by Mon 23 Nov 07:59 Taipei): create the project, add yourself, paste the short
-   description (draft will be in `docs/`). Needs your OK before posting.
-3. **Testnet wallet with a test identity** — choose one:
-   - (a) you install Concordium Wallet for Web, pick "Concordium testnet IP" (dummy data, no ID), make
-     an account, Request CCD, export the key file; or
-   - (b) Hark creates a throwaway testnet wallet in its own browser with the testnet IP (dummy
-     identity, no real data), key kept outside the repo. Nothing in it is worth money.
-   Either way **no real identity documents** are involved. Do not use a mainnet wallet.
-4. **Public GitHub repo + demo video upload** (≤ 3 min) and the **final submission** (by Thu 10 Dec
-   07:59 Taipei) — your confirmation needed for each public step.
-5. **Payout requirements: unknown.** No prize amounts or payout method are published. If a prize is
-   announced, expect Encode to ask winners for payout details (possibly a wallet address and/or KYC) at
-   that time — re-check at the 2 Nov launch and in the platform's submission terms.
+Read from the logged-in Encode dashboard on 2026-10-31 (no changes made there):
+- Programme status: **Registered** (programme page) — dashboard → My Programmes → this hackathon.
+- **Checkpoint 1** (by Sun 22 Nov 23:59 UTC = **Mon 23 Nov 07:59 Taipei**): "No submission requirements set
+  for this checkpoint"; it is done by **creating the Project** on the dashboard (fields: Project Name,
+  Description (optional), Project Image (optional); solo = just you; or join via Team Join Code).
+  Paste-ready text: `docs/CHECKPOINT1.md`. Also connect Discord in the dashboard's "Discord Integration"
+  section (programme channels + role).
+- **Final** (Checkpoint 2, by Wed 9 Dec 23:59 UTC = Thu 10 Dec 07:59 Taipei, from the project page):
+  description + Concordium components, public repo, demo video ≤ 3 min, CCDExplorer link, path to
+  production; "Make sure every link is public."
+- Prizes: still not published. No AI-tool rule, no eligibility/KYC/payout rule published.
+
+The testnet build no longer needs anything from the user: the throwaway testnet identity (Concordium
+testnet IdP, dummy attributes) and accounts were created by script; keys live in `live/.secrets/`
+(gitignored). User steps left: (1) create the project + connect Discord before 23 Nov 07:59 Taipei;
+(2) approve making the repo public, the video upload and the final submission.

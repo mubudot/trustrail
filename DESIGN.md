@@ -69,6 +69,24 @@ x402 payment. So:
 Testnet demo can start with a single-key agent account (co-signer simulated) and upgrade to the
 2-of-2 account once the account key update is scripted; mock mode exercises the 2-of-2 logic.
 
+## Verified-human approval (live since 2026-10-31)
+
+Approvals above the threshold are bound to a **Concordium Verify-and-Access (Verifiable
+Presentation V1) proof** instead of a bare owner signature:
+
+1. The verifier (the co-signer service) anchors a `VerificationRequestV1` (RegisterData) whose context
+   carries a random nonce, ResourceID `trustrail:ccd:testnet:<guard>:auth:<id>` and a context string
+   with amount, payee and purpose hash; the claim is account-based `dob` range (age ≥ 18) from the
+   trusted testnet IdP(s).
+2. The owner's wallet produces a ZK presentation from the **owner account's** credential.
+3. The verifier checks it with the node (proof, credential Active, credential belongs to the guard
+   owner, ResourceID = this authorisation), builds the `VerificationAuditRecordV1` and anchors its hash.
+4. The owner calls `approve({id, human_proof: anchorHash})`; the contract stores the hash.
+5. Before co-signing, the co-signer re-derives everything from the record JSON + chain and compares
+   the anchor hash with the authorisation's `human_proof`. Forged, missing or replayed records → refuse
+   and cancel (budget released). The contract itself cannot verify ZK proofs; that is why the binding
+   lives in the key that has to co-sign.
+
 ## Contract policy (deterministic)
 
 - Amounts are atomic units (microCCD for CCD; PLT smallest unit) as `u64`.
