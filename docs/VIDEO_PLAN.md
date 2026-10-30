@@ -1,4 +1,4 @@
-# TrustRail demo video — plan and script (target ≤ 3:00; delivered cut 2:50)
+# TrustRail demo video — plan and script (target ≤ 3:00; delivered cut 2:51)
 
 Pitch first: **No verified human, no payment.** Every on-chain screen is a real Concordium
 **testnet** transaction from the demo run in [TESTNET.md](TESTNET.md), shown on CCDExplorer. The
@@ -24,7 +24,7 @@ callout that restates the key fact so it reads on a phone.
 | 7 | 1:48–2:00 | Attack 2: CCDExplorer `cancel` (`25dd71a0…`) after a replayed genuine proof → `approval_wrong_resource` | Next, we replay a genuine proof from an earlier payment. The proof and its anchor are valid, but they name a different authorisation. Refused, and cancelled on chain. |
 | 8 | 2:00–2:16 | Attack 3: CCDExplorer Rejected, `rejected_receive` (`a7379c9c…`) = `PerTxCap`; Attack 4: look-alike seller → `payee_not_bound_to_badge` | A misbehaving agent skips its own checks and asks the guard for nine CCD directly. The contract rejects it on chain: per transaction cap. And a look-alike seller that shows a real badge but a different pay-to address is refused before any transaction. |
 | 9 | 2:16–2:36 | Terminal: real `npm run verify` output, 23 PASS, "all checks passed"; audit log head anchored after the run and matching all 6 on-chain authorisations (`38d93421…`) | Anyone can check this without keys. One command re-verifies the badges, the two-of-two wallet, both settlements against the committed transaction hash, the zero-knowledge proof, every refusal, and the audit log head anchored on chain. Twenty-three checks pass. |
-| 10 | 2:36–2:56 | Honest limits + close: owner key = policy admin (co-signer pins its own threshold); demo co-signer runs beside the agent (production: separate service); 88 tests (contract 27 · agent 27 · live adapters 34); "No verified human, no payment." | What we do not claim: the owner key can still change the policy, so the co-signer pins its own threshold and refuses without a proof. In this demo the co-signer runs beside the agent; in production it is a separate service. TrustRail. No verified human, no payment. |
+| 10 | 2:36–2:56 | Honest limits + close: owner key = policy admin (co-signer pins its own threshold); demo co-signer shares the agent's Node process (production: separate service); 88 tests (contract 27 · agent 27 · live adapters 34); "No verified human, no payment." | What we do not claim: the owner key can still change the policy, so the co-signer pins its own threshold and refuses without a proof. In this demo the co-signer shares the agent's process; production needs it as a separate service. TrustRail. No verified human, no payment. |
 
 Build: `work/ccdvid/build.py` in the hackathon workspace (outside this repo) renders the scenes from
 the explorer captures and `verify` output, narrates them with Piper, and writes `concordium_demo.mp4`.
