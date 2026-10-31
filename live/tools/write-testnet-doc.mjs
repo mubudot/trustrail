@@ -19,7 +19,7 @@ out.push('# TrustRail on Concordium testnet — live deployment and demo run', '
   '| What | Where |', '| --- | --- |',
   `| \`agent_spend_guard\` instance | [<${g.address.index},${g.address.subindex}>](${explorerContract(g.address.index, g.address.subindex)}) (module [${g.moduleRef.slice(0, 12)}…](${explorerModule(g.moduleRef)}), ${g.deployTx ? `deploy ${L(g.deployTx)}` : 'module deployed earlier'}, init ${L(g.initTx)}) |`,
   `| Bound Agent Registry | CIS-8004 [<12802,0>](${explorerContract(12802, 0)}) (the official testnet registry) |`,
-  `| Owner (accountable human; identity from the Concordium testnet IdP) | [${g.owner}](${acct(g.owner)}) |`,
+  `| Owner (the accountable-human role; a test identity from the Concordium testnet IdP with dummy attributes) | [${g.owner}](${acct(g.owner)}) |`,
   `| Buyer agent control account (calls the guard) | [${g.agent}](${acct(g.agent)}) — registered in the guard ${L(g.registerTx)} |`,
   `| Agent paying wallet, **2-of-2** (agent key 0 + co-signer key 1) | [${g.wallet}](${acct(g.wallet)}) |`,
   `| Co-signer account | [${g.cosigner}](${acct(g.cosigner)}) |`,

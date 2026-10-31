@@ -91,8 +91,8 @@ export function entryDetails(entry) {
  * LiveAgent.buy since the id was introduced) join the use that id started, so concurrent purchases
  * stay apart. An entry naming an authorisation joins the use in which that authorisation first
  * appeared, so a payment approved or settled later (a resumed pending payment) stays with its task.
- * Older entries without either fall back to the latest `request`; entries before any request form a
- * use of their own.
+ * An entry naming an authorisation the log never saw authorised gets a row of its own. Older entries
+ * without either id fall back to the latest `request`; entries before any request form a use of their own.
  */
 export function groupUses(entries) {
   const uses = [];
@@ -110,6 +110,11 @@ export function groupUses(entries) {
     }
     if (aid !== null && byAuth.has(aid)) use = byAuth.get(aid);
     else if (rid !== null && byRequest.has(rid)) use = byRequest.get(rid);
+    else if (!use && aid !== null && e.event !== 'authorized') {
+      // An authorisation this log never saw authorised (e.g. a resume after a restart): its own row, never another task's.
+      use = { entries: [] };
+      uses.push(use);
+    }
     use ??= uses.at(-1);
     if (aid !== null && !byAuth.has(aid)) byAuth.set(aid, use);
     use.entries.push(e);
@@ -248,7 +253,7 @@ export function renderAuditReport({ entries, chain, state, run, txInfo, anchorCh
     const quote = u.entries.find((e) => e.event === 'quote')?.data ?? {};
     const amt = quote.amount !== undefined ? `${ccd(quote.amount)} → ${quote.payTo ? linkAccount(quote.payTo) : '?'}` : '—';
     const txs = uniqueTxs(u.entries.flatMap(entryTxs));
-    out.push(`| ${n + 1} | ${useTimes(u, txInfo)} | ${req.intent ? `"${cell(req.intent)}"` : '—'}${req.url ? ` (${code(req.url)})` : ''} | ${amt} | ${useApproval(u, thr)} | ${useOutcome(u)} | ${txs.length ? txs.map((t) => `${cell(t.label)} ${linkTx(t.hash)}`).join('<br>') : 'none (refused before any transaction)'} |`);
+    out.push(`| ${n + 1} | ${useTimes(u, txInfo)} | ${req.intent ? `"${cell(req.intent)}"` : '—'}${req.url ? ` (${code(req.url)})` : ''} | ${amt} | ${useApproval(u, thr)} | ${useOutcome(u)} | ${txs.length ? txs.map((t) => `${cell(t.label)} ${linkTx(t.hash)}`).join('<br>') : (u.entries.some((e) => e.event === 'refused') ? 'none (refused before any transaction)' : 'none recorded')} |`);
   });
   out.push('');
 

@@ -217,3 +217,20 @@ test('LiveAgent.buy tags every entry of one purchase with the same request id', 
   assert.ok(r1.data.request && r1.data.request === f1.data.request);
   assert.ok(r2.data.request && r2.data.request === f2.data.request && r1.data.request !== r2.data.request);
 });
+
+test('a resume of an authorisation the log never saw gets its own row; transaction-free rows say what happened', () => {
+  const log = new AuditLog({ clock: () => 0 });
+  log.append('request', { request: 'A', intent: 'A' });
+  log.append('authorized', { request: 'A', authId: '1', status: 'Pending', txHash: h(1) });
+  log.append('request', { request: 'B', intent: 'B' });
+  log.append('authorized', { request: 'B', authId: '2', status: 'Pending', txHash: h(2) });
+  log.append('refused', { authId: '9', stage: 'resume', reason: 'unknown_pending' });
+  log.append('request', { intent: 'free' });
+  const uses = groupUses(log.entries);
+  assert.equal(uses.length, 4);
+  assert.match(useOutcome(uses[1]), /Pending/);
+  assert.deepEqual(uses[2].entries.map((e) => e.data.authId), ['9']);
+  const md = renderAuditReport({ entries: log.entries, chain: { ok: true }, state, run: { steps: [] } });
+  assert.match(md, /none \(refused before any transaction\)/);
+  assert.match(md, /\| none recorded \|/);
+});

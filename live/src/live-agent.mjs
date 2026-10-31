@@ -79,7 +79,7 @@ export class LiveAgent {
 
   async resume(authId) {
     const p = this.pending.get(String(authId));
-    if (!p) return this.#refuse('resume', 'unknown_pending');
+    if (!p) return this.#refuse('resume', 'unknown_pending', { authId: String(authId) });
     this.pending.delete(String(authId));
     return this.pay(BigInt(authId), p.url, p.requirements);
   }

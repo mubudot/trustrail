@@ -28,9 +28,11 @@ the owner key can flip. TrustRail makes the human part *cryptographic and specif
    listed below.)
 4. **Afterwards anyone can audit it.** The Verification Audit Record's hash sits in the guard's
    authorisation (`human_proof`) and in a RegisterData anchor; the agent's hash-chained audit log
-   head is anchored with `anchorAudit`. That is an EU AI Act Art. 12-style record with a lawful
-   route back to an accountable person (Concordium identity disclosure only via Privacy Guardians
-   and a court order). The readable record, with block times, an on-chain anchor check and an
+   head is anchored with `anchorAudit`. That is an EU AI Act Art. 12-style record. On mainnet, with a
+   real verified identity behind the owner account, it gives a lawful route back to an accountable
+   person (Concordium identity disclosure only via Privacy Guardians and a court order); in this
+   testnet demo the identity has the testnet IdP's dummy attributes and the proof is made by a
+   script holding the owner's testnet seed, so it shows the mechanism, not a real person. The readable record, with block times, an on-chain anchor check and an
    Art. 12 mapping, is [docs/AUDIT_LOG.md](docs/AUDIT_LOG.md) (`npm run audit:doc` regenerates it).
 
 ## How a payment flows
@@ -117,7 +119,7 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
 agent/               Offline reference client + mock chain (zero dependencies), 27 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 48 offline tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 49 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402
