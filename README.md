@@ -59,7 +59,7 @@ controls and optional read-only testnet checks.
 
 | The agent's logic misbehaves (prompt injection, a bug, skipped client checks) and tries to … | Stopped by |
 | --- | --- |
-| pay an address it was talked into | payee badge must be bound to `payTo` (`payee_not_bound_to_badge`); on-chain allowlist |
+| pay an address it was talked into | payee badge must be bound to `payTo` (`payee_not_bound_to_badge`), re-checked by the co-signer right before it commits (so a badge revoked while the payment waited for approval also stops it); on-chain allowlist |
 | pay more than the per-payment / daily cap, even skipping the client | guard contract rejects on chain (`PerTxCap`, `DailyCap`) |
 | make a large payment without a human | Pending until approved; the co-signer needs a verifying ZK approval record |
 | pay twice from one approval / change the transfer after approval | `commitPayment` stores the exact sign-hash once; co-signer signs only that; `verify` checks the settled transaction was signed over that hash |
@@ -122,8 +122,8 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/spend.rs       authorize / approve(id, human_proof) / reject / cancel / commitPayment / recordSettlement
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
-agent/               Offline reference client + mock chain (zero dependencies), 29 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 89 offline tests
+agent/               Offline reference client + mock chain (zero dependencies), 31 tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 91 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402
@@ -158,7 +158,7 @@ npm run audit:doc               # regenerate docs/AUDIT_LOG.md from live/state/a
 
 Reproducing the deployment from scratch (own throwaway testnet identity, accounts, faucet,
 contract, badges, demo) is scripted in `live/tools/`, step by step in [docs/RUNBOOK.md](docs/RUNBOOK.md).
-The suites contain **152 tests**: contract 34, agent 29, live 89. The offline Node attack runner
+The suites contain **156 tests**: contract 34, agent 31, live 91. The offline Node attack runner
 reports **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**; the root command also runs 7 Rust
 attack tests that print 27 contract refusals and 3 legitimate controls.
 

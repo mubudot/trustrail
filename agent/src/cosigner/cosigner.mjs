@@ -7,6 +7,7 @@
 import { GuardError } from '../policy/errors.mjs';
 import { purposeHash } from '../util/canonical.mjs';
 import { MAX_EXPIRY_S, signDigest, signingDigest, transferOf, verifyDigest } from '../payments/tx.mjs';
+import { checkPayee } from '../identity/badge.mjs';
 
 export class CosignRefused extends Error {
   constructor(reason) {
@@ -23,12 +24,16 @@ export class Cosigner {
    */
   /*   `verifyHumanApproval(authId, humanProof)` must return true only for a verified record (live:
    *   Concordium Verify-and-Access audit record re-checked against the chain; see live/src). */
-  constructor({ guard, account, keyPair, agentAccount, agentPublicKey, verifyHumanApproval = () => false, clock = () => Date.now() }) {
-    Object.assign(this, { guard, account, keyPair, agentAccount, agentPublicKey, verifyHumanApproval, clock });
+  /*   `resolver` (optional): the co-signer's own badge resolver. When set, the payee's badge is
+   *   re-checked right before commitPayment, so a badge revoked or a card changed after the
+   *   purchase started (e.g. while it waited for human approval) blocks the payment even if the
+   *   buyer skips its own check. */
+  constructor({ guard, account, keyPair, agentAccount, agentPublicKey, verifyHumanApproval = () => false, clock = () => Date.now(), resolver = null, requireVerifiedPayee = true }) {
+    Object.assign(this, { guard, account, keyPair, agentAccount, agentPublicKey, verifyHumanApproval, clock, resolver, requireVerifiedPayee });
   }
 
-  /** Returns the co-signature (hex) or throws CosignRefused. */
-  cosign({ authId, tx, resourceUrl, requirements }) {
+  /** Resolves to the co-signature (hex) or rejects with CosignRefused. */
+  async cosign({ authId, tx, resourceUrl, requirements }) {
     const no = (r) => { throw new CosignRefused(r); };
     const view = this.guard.authorization(authId);
     if (!view) no('unknown_authorization');
@@ -67,6 +72,11 @@ export class Cosigner {
     const digest = signingDigest(tx);
     const agentSig = tx.signatures?.sender?.[0]?.[0];
     if (!agentSig || !verifyDigest(this.agentPublicKey, digest, agentSig)) no('agent_signature_invalid');
+    // Counterparty, re-checked now (not at quote time) against the authorised payee.
+    if (this.resolver) {
+      const issue = await checkPayee({ resolver: this.resolver, badge: requirements?.extra?.payeeBadge, payTo: a.payee, required: this.requireVerifiedPayee });
+      if (issue) no(issue);
+    }
 
     try {
       this.guard.commitPayment(this.account, { id: authId, digest });

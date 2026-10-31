@@ -76,7 +76,7 @@ export function createWorld({ startMs = Date.UTC(2026, 11, 1, 9, 0, 0), policy }
   };
   const cosigner = new Cosigner({
     guard, account: ACCOUNTS.cosigner, keyPair: cosignerKeys, agentAccount: ACCOUNTS.agent, agentPublicKey: agentKeys.publicKey, clock,
-    verifyHumanApproval: (authId, proof) => humanProofs.get(String(authId)) === proof,
+    verifyHumanApproval: (authId, proof) => humanProofs.get(String(authId)) === proof, resolver,
   });
   const audit = new AuditLog({ clock });
   const agent = new TrustedAgent({

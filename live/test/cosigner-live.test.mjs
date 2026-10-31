@@ -4,6 +4,7 @@ import { LiveCosigner, CosignRefused } from '../src/cosigner-live.mjs';
 import { buildTransfer, signAsKey, toJSON, signingDigest, fromJSON } from '../src/x402-buyer.mjs';
 import { verifyDigestWithKey } from '../src/keys.mjs';
 import { purposeHash } from '../../agent/src/util/canonical.mjs';
+import { HostedBadgeResolver } from '../../agent/src/identity/badge.mjs';
 import { A, FakeGuard, auth, record, fakeGrpc, requirements, walletKeys } from './helpers.mjs';
 
 const URL_ = 'http://127.0.0.1:4402/dataset';
@@ -139,4 +140,42 @@ test('pinned threshold: amounts at or below it still need no proof; above it a v
   const sig = await ok.cos.cosign({ authId: 1n, signableJSON: toJSON(ok.tx), resourceUrl: URL_, requirements: requirements() });
   assert.ok(sig);
   assert.equal(ok.checked.length, 1, 'proof verified');
+});
+
+test('re-checks the payee badge right before committing: revoked badge, changed card, missing badge', async () => {
+  const registry = (patch) => new HostedBadgeResolver({ fetchImpl: async () => ({ ok: true, json: async () => ({
+    badge_valid: true, card_sha256: 'aa'.repeat(32),
+    on_chain: { status: 'Active', owner_account: A.seller, metadata_hash_hex: 'aa'.repeat(32) }, ...patch(A.seller) }) }) });
+  const cases = [
+    [() => ({}), 'signed'],
+    [(s) => ({ on_chain: { status: 'Revoked', owner_account: s, metadata_hash_hex: 'aa'.repeat(32) } }), 'payee_badge_revoked'],
+    [() => ({ card_sha256: 'bb'.repeat(32) }), 'payee_card_hash_mismatch'],
+    [(s) => ({ on_chain: { status: 'Active', owner_account: A.cosigner, metadata_hash_hex: 'aa'.repeat(32) } }), 'payee_not_bound_to_badge'],
+  ];
+  for (const [patch, expected] of cases) {
+    const { guard, cos, tx } = await setup();
+    cos.resolver = registry(patch);
+    assert.equal(await refusal(cos.cosign({ authId: 1n, signableJSON: toJSON(tx), resourceUrl: URL_, requirements: requirements() })), expected);
+    assert.equal(guard.sent.filter((s) => s.entry === 'commitPayment').length, expected === 'signed' ? 1 : 0);
+  }
+  const { cos, tx } = await setup();
+  cos.resolver = registry(() => ({}));
+  const noBadge = requirements();
+  delete noBadge.extra.payeeBadge;
+  assert.equal(await refusal(cos.cosign({ authId: 1n, signableJSON: toJSON(tx), resourceUrl: URL_, requirements: noBadge })), 'purpose_mismatch');
+});
+
+test('live buyer: resume re-checks the badge and releases the authorisation instead of paying', async () => {
+  const { LiveAgent } = await import('../src/live-agent.mjs');
+  const { AuditLog } = await import('../../agent/src/audit/log.mjs');
+  const released = [];
+  const cosigner = { release: async (id) => { released.push(id); return true; }, lastCancelTx: 'cc'.repeat(32),
+    cosign: async () => { throw new Error('must not be reached'); } };
+  const resolver = { resolve: async () => ({ valid: true, active: false, owner: A.seller }) };
+  const buyer = new LiveAgent({ guard: {}, agent: { address: A.agent }, cosigner, resolver, audit: new AuditLog(), network: 'ccd:test' });
+  buyer.pending.set('7', { url: URL_, requirements: requirements() });
+  const out = await buyer.resume(7n);
+  assert.deepEqual([out.status, out.stage, out.reason, out.released], ['refused', 'identity', 'payee_badge_revoked', true]);
+  assert.deepEqual(released, [7n]);
+  assert.equal(buyer.pending.size, 0);
 });

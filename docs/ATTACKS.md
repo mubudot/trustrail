@@ -27,8 +27,8 @@ succeed. Unexpected acceptance, a different refusal, an exception or a failed co
 auto-approved payment, an active badge with its original card, and settlement/audit verification.
 The Rust tests also demonstrate legitimate pre-expiry, unpause and new-generation operations.
 
-Measured suites: **152 tests** — contract **9 unit + 25 integration = 34**, agent **29**, live
-**89**. The Node runner prints **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. The 7 new
+Measured suites: **156 tests** — contract **9 unit + 25 integration = 34**, agent **31**, live
+**91**. The Node runner prints **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. The 7 new
 Rust tests print 27 contract refusals and 3 controls (additional to the Node summary).
 
 The Node runner calls **LiveCosigner, checkApproval, HostedBadgeResolver/checkPayee,
@@ -50,6 +50,7 @@ test-only CIS-2 registry to answer `balanceOf`.
 | Revoked / expired badge | Registry reports a status other than Active | Client badge check | `payee_badge_revoked` | `attack suite 22`, `23` |
 | NFT not held | Re-register using a nonexistent token whose `balanceOf` is 0 | Contract | `BadgeNotOwned`; subsequent authorize: `NotAgent` | `nonexistent_nft_registration_is_atomic_and_does_not_bump_generation` (C19–C20) |
 | Badge lost after authorization | Burn NFT, then have anyone invoke `recheckBadge`; try existing approval/commit | Contract | `AgentPaused` | `badge_loss_recheck_invalidates_existing_approval_and_commit_paths` (C21–C22) |
+| Badge revoked / card changed while awaiting approval | Purchase passes the badge check, waits for human approval; meanwhile the badge is revoked or the card hash changes; then resume | Buyer resume re-check; co-signer re-checks the badge itself right before `commitPayment` (also when the buyer skips its check) | `payee_badge_revoked`, `payee_card_hash_mismatch` (stage `identity`, or `cosigner`); authorisation released | `agent/test/flow.test.mjs` (2 tests); `live/test/cosigner-live.test.mjs` (2 tests) |
 | Tampered Agent Card | Change local card JSON after its original hash was pinned; registry returns a different fetched SHA-256 | Client badge check | `payee_card_hash_mismatch` | `attack suite 24`; `agent/test/attacks.test.mjs` |
 | Wrong transfer payee / amount | Submit an agent-signed transfer differing from the human-approved authorization | Co-signer | `tx_payee_mismatch`, `tx_amount_mismatch` | `attack suite 08`, `09` |
 | Removed allowlist entry | Remove payee after approval, or skip preflight with an unlisted payee | Co-signer; mock guard; contract | `payee_not_allowlisted`; `NotAllowlisted` | `attack suite 13`, `27`; `bypassed_client_checks_preserve_caps_allowlist_and_auth_counter` (C25–C27) |

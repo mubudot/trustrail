@@ -33,7 +33,9 @@ export async function createLiveWorld() {
   const st = readState();
   const acc = loadAccounts();
   const guard = deployedGuard(grpc);
+  const resolver = new HostedBadgeResolver();
   const cosigner = new LiveCosigner({
+    resolver, // the co-signer re-checks the payee badge itself, right before it commits
     guard, account: { address: acc.cosigner.address, signer: roleSigner(acc.cosigner) },
     walletKey: acc.wallet.keys[1].privateKey, agentPublicKey: acc.wallet.keys[0].publicKey,
     agentAccount: acc.agent.address, owner: acc.owner.address,
@@ -49,7 +51,7 @@ export async function createLiveWorld() {
   const impostor = await listen(createSellerApp({ payTo: acc.cosigner.address, badge: st.badges.seller.tokenAddress, facilitator, items: { '/refund': ITEMS['/weather'] } }), 4403);
   const agent = new LiveAgent({
     grpc, guard, agent: { address: acc.agent.address, signer: roleSigner(acc.agent) }, walletKey0: acc.wallet.keys[0].privateKey,
-    cosigner, resolver: new HostedBadgeResolver(), audit, network: TESTNET.x402Network,
+    cosigner, resolver, audit, network: TESTNET.x402Network,
   });
   const close = () => { seller.srv.close(); impostor.srv.close(); };
   return { grpc, st, acc, guard, cosigner, audit, agent, seller, impostor, close };

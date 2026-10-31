@@ -81,6 +81,12 @@ export class LiveAgent {
     const p = this.pending.get(String(authId));
     if (!p) return this.#refuse('resume', 'unknown_pending', { authId: String(authId) });
     this.pending.delete(String(authId));
+    // The badge may have been revoked or the card changed while this waited for approval.
+    const badgeIssue = await checkPayee({ resolver: this.resolver, badge: p.requirements.extra?.payeeBadge, payTo: p.requirements.payTo, required: this.requireVerifiedPayee });
+    if (badgeIssue) {
+      const released = await this.cosigner.release(BigInt(authId));
+      return this.#refuse('identity', badgeIssue, { authId: String(authId), payTo: p.requirements.payTo, released, cancelTx: this.cosigner.lastCancelTx });
+    }
     return this.pay(BigInt(authId), p.url, p.requirements);
   }
 

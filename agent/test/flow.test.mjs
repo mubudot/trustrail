@@ -28,7 +28,12 @@ test('unverified seller refused when verified payees are required', async () => 
   const w = createWorld();
   const r = await w.agent.buy('https://shady.example/cheap-data');
   assert.equal(r.reason, 'payee_has_no_badge');
+  // Relaxing only the buyer is not enough: the co-signer enforces its own verified-payee policy.
   w.agent.requireVerifiedPayee = false;
+  const viaBuyerOnly = await w.agent.buy('https://shady.example/cheap-data');
+  assert.equal(viaBuyerOnly.stage, 'cosigner');
+  assert.equal(viaBuyerOnly.reason, 'payee_has_no_badge');
+  w.cosigner.requireVerifiedPayee = false;
   assert.equal((await w.agent.buy('https://shady.example/cheap-data')).status, 'paid');
 });
 
@@ -121,4 +126,34 @@ test('mock guard validates policy and wallet like the contract', () => {
   assert.throws(reg({}, ['p'], 'a2'), /InvalidWallet/);
   assert.throws(reg({}, ['w2'], 'w2'), /InvalidWallet/);
   assert.throws(() => w.guard.setAllowlist(ACCOUNTS.owner, { agent: ACCOUNTS.agent, allowlist: [ACCOUNTS.wallet] }), /InvalidWallet/);
+});
+
+test('payee badge revoked or card changed while waiting for approval: resume refuses and releases', async () => {
+  for (const [change, reason] of [[(e) => { e.active = false; }, 'payee_badge_revoked'],
+    [(e) => { e.issue = 'payee_card_hash_mismatch'; }, 'payee_card_hash_mismatch']]) {
+    const w = createWorld();
+    const r = await w.agent.buy('https://data.example/dataset');
+    assert.equal(r.status, 'pending_approval');
+    change(w.cosigner.resolver.entries.BadgeDataSeller); // the registry changes after the quote
+    w.humanApprove(r.authId);
+    const out = await w.agent.resume(r.authId);
+    assert.equal(out.status, 'refused');
+    assert.equal(out.stage, 'identity');
+    assert.equal(out.reason, reason);
+    assert.equal(w.guard.authorization(r.authId).auth.status, 'Cancelled');
+    assert.equal(w.ledger.account(ACCOUNTS.dataSeller)?.balance ?? 0n, 0n);
+  }
+});
+
+test('co-signer re-checks the payee badge itself, even when the buyer skips its check', async () => {
+  const w = createWorld();
+  const r = await w.agent.buy('https://data.example/dataset');
+  w.agent.resolver = { resolve: async () => ({ valid: true, active: true, agentWallet: ACCOUNTS.dataSeller }) }; // buyer misled
+  w.cosigner.resolver.entries.BadgeDataSeller.active = false;
+  w.humanApprove(r.authId);
+  const out = await w.agent.resume(r.authId);
+  assert.equal(out.stage, 'cosigner');
+  assert.equal(out.reason, 'payee_badge_revoked');
+  assert.equal(out.released, true);
+  assert.equal(w.ledger.account(ACCOUNTS.dataSeller)?.balance ?? 0n, 0n);
 });

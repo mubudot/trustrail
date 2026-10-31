@@ -10,6 +10,7 @@ import { signDigestWithKey, verifyDigestWithKey } from './keys.mjs';
 import { AccountAddress } from '@concordium/web-sdk';
 import { checkApproval as checkApprovalOnChain, approvalResourceId, approvalContextString } from './human-approval.mjs';
 import { enumTag, unOpt } from './guard-client.mjs';
+import { checkPayee } from '../../agent/src/identity/badge.mjs';
 
 export const MAX_EXPIRY_S = 600;
 /** Execution energy of a simple CCD transfer (what @x402/concordium and our buyer set). */
@@ -102,6 +103,12 @@ export class LiveCosigner {
     const digest = signingDigest(tx);
     const agentSig = signableJSON.signatures?.sender?.[0]?.[0];
     if (!agentSig || !verifyDigestWithKey(this.agentPublicKey, digest, agentSig)) no('agent_signature_invalid');
+    // Counterparty, re-checked now (not at quote time) against the authorised payee: a badge revoked
+    // or a card changed while the payment waited for approval blocks it even if the buyer skips its check.
+    if (this.resolver) {
+      const issue = await checkPayee({ resolver: this.resolver, badge: requirements?.extra?.payeeBadge, payTo: a.payee, required: this.requireVerifiedPayee ?? true });
+      if (issue) no(issue);
+    }
 
     try {
       const c = await this.guard.send('commitPayment', { id: BigInt(authId), digest }, { sender: this.account.address, signer: this.account.signer });

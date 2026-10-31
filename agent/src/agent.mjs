@@ -60,6 +60,9 @@ export class TrustedAgent {
     const p = this.pending.get(String(authId));
     if (!p) return this.#refuse('resume', 'unknown_pending');
     this.pending.delete(String(authId));
+    // The badge may have been revoked or the card changed while this waited for approval.
+    const badgeIssue = await checkPayee({ resolver: this.resolver, badge: p.requirements.extra?.payeeBadge, payTo: p.requirements.payTo, required: this.requireVerifiedPayee });
+    if (badgeIssue) return this.#refuse('identity', badgeIssue, { authId, payTo: p.requirements.payTo, released: this.cosigner.release(authId) });
     return this.#pay(authId, p.url, p.requirements);
   }
 
@@ -73,7 +76,7 @@ export class TrustedAgent {
       requirements, nowS: Math.floor(this.clock() / 1000), notAfterS: Number(auth.expiresAt / 1000n),
     });
     try {
-      tx.signatures.sender[0][1] = this.cosigner.cosign({ authId, tx, resourceUrl: url, requirements });
+      tx.signatures.sender[0][1] = await this.cosigner.cosign({ authId, tx, resourceUrl: url, requirements });
     } catch (e) {
       if (!(e instanceof CosignRefused)) throw e;
       // Refused before commitPayment, so the authorisation was never co-signed: release its budget.
