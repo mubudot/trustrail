@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TransactionHash } from '@concordium/web-sdk';
 import { AuditLog } from '../../agent/src/audit/log.mjs';
-import { renderAuditReport, resolveTxInfo, entryTxs, groupUses, useOutcome, useApproval, uniqueTxs, ccd, cell } from '../src/audit-report.mjs';
+import { renderAuditReport, resolveTxInfo, entryTxs, groupUses, useOutcome, useApproval, uniqueTxs, ccd, cell, code } from '../src/audit-report.mjs';
 import { A } from './helpers.mjs';
 
 const h = (i) => i.toString(16).padStart(64, '0');
@@ -38,6 +38,8 @@ test('ccd() formats microCCD exactly, and cell() escapes table syntax', () => {
   assert.equal(ccd('1'), '0.000001 CCD');
   assert.equal(ccd('12345678'), '12.345678 CCD');
   assert.equal(cell('a|b\nc'), 'a\\|b c');
+  assert.equal(code('PerTxCap'), '`PerTxCap`');
+  assert.equal(code('a`b'), 'a\\`b');
 });
 
 test('every transaction-hash field of an entry gets a labelled CCDExplorer link', () => {
@@ -66,8 +68,8 @@ test('integrity section: intact chain + covering anchor; a broken chain and a st
   const entries = sampleLog();
   const ok = renderAuditReport({ entries, chain: AuditLog.verify(entries), state, run: runFor(entries) });
   assert.match(ok, /Hash chain: \*\*intact\*\* \(12 entries/);
-  assert.match(ok, /It covers the whole log\./);
-  assert.match(ok, /Chain check: not run \(offline\)/);
+  assert.match(ok, /Its head and count equal this log's last entry and length\./);
+  assert.match(ok, /Chain check: \*\*not run\*\*/);
 
   const tampered = entries.map((e) => ({ ...e, data: { ...e.data } }));
   tampered[4].data.amount = '5000000';
@@ -102,4 +104,57 @@ test('resolveTxInfo: block time + outcome for finalized txs, "not found" is repo
   assert.deepEqual(info.get(h(3)), { finalized: false });
   assert.equal(info.get('zz').invalid, true);
   await assert.rejects(resolveTxInfo(grpc, [h(4)]), /UNAVAILABLE/);
+});
+
+test('a broken chain never gets PASS or "covers", even if the anchor check itself passed', () => {
+  const entries = sampleLog();
+  const tampered = entries.map((e) => ({ ...e, data: { ...e.data } }));
+  tampered[4].data.amount = '5000000'; // stored hashes kept: head and count still match the anchor
+  const md = renderAuditReport({ entries: tampered, chain: AuditLog.verify(tampered), state, run: runFor(entries),
+    anchorCheck: { ok: true, reasons: [], onChainAuthCount: 2 }, readAt: '2026-10-31T00:00:00.000Z' });
+  assert.match(md, /\*\*BROKEN at entry 4\*\*/);
+  assert.doesNotMatch(md, /\*\*PASS\*\*/);
+  assert.doesNotMatch(md, /head and count equal/);
+  assert.match(md, /\*\*FAIL\*\*: the hash chain is broken/);
+});
+
+test('no anchor in run.json is stated, not glossed over', () => {
+  const entries = sampleLog();
+  const md = renderAuditReport({ entries, chain: { ok: true }, state, run: { steps: [] }, anchorCheck: { ok: false, reasons: ['no anchor recorded in live/state/run.json'] }, readAt: 'x' });
+  assert.match(md, /\*\*No anchor\*\* is recorded/);
+  assert.match(md, /\*\*FAIL\*\*: no anchor recorded/);
+});
+
+test('logged values cannot inject Markdown links, images, HTML or break out of code spans', () => {
+  const log = new AuditLog({ clock: () => 0 });
+  log.append('request', { intent: '![x](https://attacker.example/i.png) <img src=x> [click](https://evil)', url: 'http://a/`b` [x](y)' });
+  log.append('quote', { amount: '1', payTo: '[evil](https://attacker.example)', badge: 'x](https://evil' });
+  log.append('refused', { reason: '`; [z](https://evil)', stage: 'preflight' });
+  const md = renderAuditReport({ entries: log.entries, chain: AuditLog.verify(log.entries), state, run: { steps: [] } });
+  assert.doesNotMatch(md, /!\[x\]\(/);
+  assert.doesNotMatch(md, /<img/);
+  assert.doesNotMatch(md, /\]\(https:\/\/(attacker|evil)/);
+  assert.match(md, /not an account address/);
+});
+
+test('a payment resumed after other requests stays with its own task', () => {
+  const log = new AuditLog({ clock: () => 0 });
+  log.append('request', { intent: 'A' });
+  log.append('authorized', { authId: '7', status: 'Pending', txHash: h(1) });
+  log.append('request', { intent: 'B' });
+  log.append('authorized', { authId: '8', status: 'Pending', txHash: h(2) });
+  log.append('human_approved', { authId: '7', approveTx: h(3) });
+  log.append('settled', { authId: '7', txHash: h(4), recordTx: h(5) });
+  const [a, b] = groupUses(log.entries);
+  assert.deepEqual(a.entries.map((e) => e.event), ['request', 'authorized', 'human_approved', 'settled']);
+  assert.deepEqual(b.entries.map((e) => e.event), ['request', 'authorized']);
+  assert.equal(useApproval(b, '2000000'), '—');
+  assert.match(useOutcome(b), /Pending/);
+});
+
+test('offline rendering says block times were not read, instead of "nothing on chain"', () => {
+  const md = renderAuditReport({ entries: sampleLog(), chain: { ok: true }, state, run: { steps: [] } });
+  assert.match(md, /block times not read: offline/);
+  assert.match(md, /\(no transaction\)/);
+  assert.doesNotMatch(md, /agent clock; nothing on chain/);
 });

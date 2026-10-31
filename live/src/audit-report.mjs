@@ -13,7 +13,7 @@ export const EVENT_MEANING = Object.freeze({
   request: 'The agent was asked to fetch a paid resource (input: intent and URL).',
   quote: 'The seller answered HTTP 402 with x402 payment requirements (amount, payee, payee badge).',
   authorized: 'The guard contract checked the payment against the on-chain policy (caps, allowlist, threshold).',
-  human_approved: 'A verified human (ZK proof from the owner account\'s identity credential, no personal data) approved this exact authorisation; the record is anchored on chain.',
+  human_approved: 'The owner approved this exact authorisation with a ZK proof from the owner account\'s identity credential (no identity attributes disclosed); the record is anchored on chain.',
   approved_without_proof: 'The owner key approved without a verifiable human proof (attack scenario).',
   approved_with_replayed_proof: 'The owner key approved with a genuine proof that belongs to a different authorisation (attack scenario).',
   cosigned: 'The co-signer re-checked everything, committed the exact transaction digest on chain and signed key 1.',
@@ -35,16 +35,27 @@ const TX_LABELS = Object.freeze({
 
 const HEX64 = /^[0-9a-f]{64}$/i;
 const short = (h) => `${String(h).slice(0, 10)}…`;
-/** Escape text for a Markdown table cell. */
-export const cell = (v) => String(v ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+/**
+ * Escape untrusted text for a Markdown table cell: every character that could open a link, image,
+ * code span, emphasis or HTML is backslash-escaped (or entity-encoded), and newlines are flattened.
+ */
+export const cell = (v) => String(v ?? '')
+  .replace(/\r?\n|\r/g, ' ')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/[\\`*_{}\[\]()#+!|~]/g, (c) => `\\${c}`);
+/** A code span for values made only of safe characters (reason codes, URLs); anything else is escaped text. */
+export const code = (v) => (/^[A-Za-z0-9_:.\/?=&%,@\u2026-]+$/.test(String(v ?? '')) ? `\`${String(v)}\`` : cell(v));
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
+const isAccount = (a) => BASE58.test(String(a ?? '')) && String(a).length === 50;
 export const ccd = (micro) => {
   if (!/^\d+$/.test(String(micro ?? ''))) return cell(micro);
   const s = String(micro).padStart(7, '0');
   const frac = s.slice(-6).replace(/0+$/, '');
   return `${s.slice(0, -6).replace(/^0+(?=\d)/, '')}${frac ? `.${frac}` : ''} CCD`;
 };
-const linkTx = (h, label = short(h)) => (HEX64.test(String(h)) ? `[${label}](${explorerTx(String(h).toLowerCase())})` : `\`${cell(h)}\` (not a transaction hash)`);
-const linkAccount = (a) => `[${short(a)}](${explorerAccount(a)})`;
+const linkTx = (h, label = short(h)) => (HEX64.test(String(h)) ? `[${label}](${explorerTx(String(h).toLowerCase())})` : `${code(h)} (not a transaction hash)`);
+const linkAccount = (a) => (isAccount(a) ? `[${short(a)}](${explorerAccount(a)})` : `${cell(a)} (not an account address)`);
+const linkBadge = (b) => (BASE58.test(String(b ?? '')) ? `[${b}](${BADGE_CHECK_URL}/${b})` : cell(b));
 
 /** Every transaction one entry names, with a label: [{field, label, hash}]. */
 export function entryTxs(entry) {
@@ -60,23 +71,33 @@ export function entryDetails(entry) {
   const parts = [];
   if (d.authId !== undefined && d.authId !== null) parts.push(`authorisation #${cell(d.authId)}`);
   if (d.intent) parts.push(`intent "${cell(d.intent)}"`);
-  if (d.url) parts.push(`resource \`${cell(d.url)}\``);
+  if (d.url) parts.push(`resource ${code(d.url)}`);
   if (d.amount !== undefined) parts.push(ccd(d.amount));
   if (d.payTo) parts.push(`payee ${linkAccount(d.payTo)}`);
-  if (d.badge) parts.push(`payee badge [${cell(d.badge)}](${BADGE_CHECK_URL}/${encodeURIComponent(d.badge)})`);
+  if (d.badge) parts.push(`payee badge ${linkBadge(d.badge)}`);
   if (d.status) parts.push(`guard status **${cell(d.status)}**`);
   if (d.stage) parts.push(`refused by ${cell(d.stage)}`);
-  if (d.reason) parts.push(`reason \`${cell(d.reason)}\``);
+  if (d.reason) parts.push(`reason ${code(d.reason)}`);
   if (d.released !== undefined) parts.push(d.released ? 'daily budget released' : 'budget not released');
-  if (d.anchorHash) parts.push(`approval record hash \`${short(d.anchorHash)}\``);
+  if (d.anchorHash) parts.push(`approval record hash ${code(short(d.anchorHash))}`);
   return parts.join('; ');
 }
 
-/** Split the log into uses: each `request` starts one; entries before the first request form use 0. */
+/**
+ * Split the log into uses. Each `request` starts one. An entry that names an authorisation belongs
+ * to the use in which that authorisation first appeared, so a payment approved or settled later
+ * (after other requests, e.g. a resumed pending payment) stays with its own task. Other entries
+ * belong to the latest use; entries before the first request form a use of their own.
+ */
 export function groupUses(entries) {
   const uses = [];
+  const byAuth = new Map();
   for (const e of entries) {
     if (e.event === 'request' || uses.length === 0) uses.push({ entries: [] });
+    const id = e?.data?.authId;
+    const key = id === undefined || id === null ? null : String(id);
+    if (key !== null && byAuth.has(key)) { byAuth.get(key).entries.push(e); continue; }
+    if (key !== null) byAuth.set(key, uses.at(-1));
     uses.at(-1).entries.push(e);
   }
   return uses;
@@ -86,12 +107,12 @@ export function groupUses(entries) {
 export function useOutcome(use) {
   const ev = use.entries;
   const refused = ev.find((e) => e.event === 'refused');
-  if (refused) return `refused (${cell(refused.data?.stage ?? '?')}: \`${cell(refused.data?.reason ?? '?')}\`)`;
+  if (refused) return `refused (${cell(refused.data?.stage ?? '?')}: ${code(refused.data?.reason ?? '?')})`;
   if (ev.some((e) => e.event === 'settled')) return 'paid and recorded';
   if (ev.some((e) => e.event === 'paid')) return 'paid, not yet recorded in the guard';
   const auth = ev.findLast((e) => e.event === 'authorized');
   if (auth) return `authorised (${cell(auth.data?.status ?? '?')}), no payment logged`;
-  return ev.length ? `ended after \`${cell(ev.at(-1).event)}\`` : 'empty';
+  return ev.length ? `ended after ${code(ev.at(-1).event)}` : 'empty';
 }
 
 /** Who/what approved a use, in words. */
@@ -144,9 +165,14 @@ const txCell = (txs, info) => txs.map((t) => {
 }).join('<br>');
 
 function useTimes(use, info) {
-  const times = use.entries.flatMap(entryTxs).map((t) => info?.get(t.hash)).filter((i) => i?.finalized).map((i) => i.blockTime).sort();
-  if (times.length) return times[0] === times.at(-1) ? times[0] : `${times[0]} → ${times.at(-1)}`;
-  return `${cell(use.entries[0]?.at ?? '?')} (agent clock; nothing on chain)`;
+  const txs = use.entries.flatMap(entryTxs);
+  const times = txs.map((t) => info?.get(t.hash)).filter((i) => i?.finalized).map((i) => i.blockTime).sort();
+  if (times.length) return `${times[0] === times.at(-1) ? times[0] : `${times[0]} → ${times.at(-1)}`}${times.length < new Set(txs.map((t) => t.hash)).size ? ' (some transactions not finalized / not found)' : ''}`;
+  const first = cell(use.entries[0]?.at ?? '?');
+  const last = cell(use.entries.at(-1)?.at ?? '?');
+  const clock = `agent clock ${first === last ? first : `${first} → ${last}`}`;
+  if (!txs.length) return `${clock} (no transaction)`;
+  return info ? `${clock} (transactions not finalized / not found)` : `${clock} (block times not read: offline)`;
 }
 
 /**
@@ -169,21 +195,26 @@ export function renderAuditReport({ entries, chain, state, run, txInfo, anchorCh
   const out = [];
   out.push('# TrustRail audit record (EU AI Act Art. 12-style)', '',
     `The buyer agent's own log, \`live/state/audit.jsonl\`: ${entries.length} entries, each holding the SHA-256 of the one before it,`,
-    `with the head anchored on Concordium **testnet** in the guard contract ${guardLink}. Every transaction an entry names links to CCDExplorer.`,
+    `whose head is meant to be anchored on Concordium **testnet** in the guard contract ${guardLink} (see Integrity). Every transaction an entry names links to CCDExplorer.`,
     'Generated by `live/tools/write-audit-doc.mjs` (`cd live && npm run audit:doc`, read-only, no keys). This file is a view; the JSONL file is the record.', '',
     '> Scope: this demo agent is not a high-risk AI system under the AI Act and this is not a conformity assessment.',
-    '> It shows how an agent that moves money can keep Art. 12-style logs that a deployer, an auditor or a court can check without trusting the operator.', '');
+    '> It shows how an agent that moves money can keep Art. 12-style logs that a deployer or an auditor can check against the chain instead of taking the operator\'s word (limits: README, "Trust assumptions and known limitations").', '');
 
   out.push('## Integrity', '');
-  out.push(`- Hash chain: ${chain.ok ? `**intact** (${entries.length} entries, genesis → head \`${short(entries.at(-1)?.hash ?? '')}\`)` : `**BROKEN at entry ${chain.brokenAt}**: the entries from there on cannot be trusted`}.`);
+  out.push(`- Hash chain: ${chain.ok ? `**intact** (${entries.length} entries, genesis → head ${code(short(entries.at(-1)?.hash ?? ''))})` : `**BROKEN at entry ${cell(chain.brokenAt)}**: the entries from there on cannot be trusted, and no anchor can vouch for them`}.`);
   if (anchor) {
     const i = txInfo?.get(String(anchor.txHash).toLowerCase());
-    out.push(`- Latest anchor: head \`${short(anchor.head)}\` of ${anchor.count} entries, \`anchorAudit\` ${linkTx(anchor.txHash)}${i?.finalized ? ` (block ${i.blockHeight}, ${i.blockTime}, ${i.outcome})` : ''}. ${anchor.head === entries.at(-1)?.hash && Number(anchor.count) === entries.length ? 'It covers the whole log.' : '**It does not cover the whole log** (entries were added after it, or the log was changed).'}`);
-    for (const a of anchors.slice(0, -1)) out.push(`- Earlier anchor: ${a.count} entries, ${linkTx(a.txHash)}.`);
-  } else out.push('- No anchor recorded in `live/state/run.json`.');
+    const covers = anchor.head === entries.at(-1)?.hash && Number(anchor.count) === entries.length;
+    const coverage = !chain.ok ? 'It cannot vouch for a broken chain.'
+      : covers ? 'Its head and count equal this log\'s last entry and length.' : '**It does not cover the whole log** (entries were added after it, or the log was changed).';
+    out.push(`- Latest anchor recorded in \`live/state/run.json\`: head ${code(short(anchor.head))} of ${cell(anchor.count)} entries, \`anchorAudit\` ${linkTx(anchor.txHash)}${i?.finalized ? ` (block ${i.blockHeight}, ${i.blockTime}, ${i.outcome})` : ''}. ${coverage}`);
+    for (const a of anchors.slice(0, -1)) out.push(`- Earlier anchor: ${cell(a.count)} entries, ${linkTx(a.txHash)}.`);
+  } else out.push('- **No anchor** is recorded in `live/state/run.json`: nothing on chain vouches for this log.');
   if (anchorCheck) {
-    out.push(`- Chain check at ${cell(readAt ?? '?')}: ${anchorCheck.ok ? `**PASS**. The \`AuditAnchored\` event matches this log and postdates every transaction it names, and the log records the current lifecycle of all ${anchorCheck.onChainAuthCount} authorisations the guard holds` : `**FAIL**: ${anchorCheck.reasons.map(cell).join('; ')}`}.`);
-  } else out.push('- Chain check: not run (offline). Run `npm run verify` or `npm run audit:doc`.');
+    const pass = anchorCheck.ok && chain.ok;
+    const why = [...(chain.ok ? [] : ['the hash chain is broken']), ...anchorCheck.reasons].map(cell).join('; ');
+    out.push(`- Chain check at ${cell(readAt ?? '?')}: ${pass ? `**PASS**. The \`AuditAnchored\` event matches this log and postdates every transaction it names, and the log records the current lifecycle of all ${cell(anchorCheck.onChainAuthCount)} authorisations the guard holds` : `**FAIL**: ${why || 'unknown'}`}.`);
+  } else out.push('- Chain check: **not run** (generated with `--offline`). The anchor above is unverified here; run `npm run verify` or `npm run audit:doc`.');
   out.push('- What an anchor does and does not prove: see "Trust assumptions and known limitations" in the README.', '');
 
   out.push('## Uses of the agent', '',
@@ -194,7 +225,7 @@ export function renderAuditReport({ entries, chain, state, run, txInfo, anchorCh
     const quote = u.entries.find((e) => e.event === 'quote')?.data ?? {};
     const amt = quote.amount !== undefined ? `${ccd(quote.amount)} → ${quote.payTo ? linkAccount(quote.payTo) : '?'}` : '—';
     const txs = uniqueTxs(u.entries.flatMap(entryTxs));
-    out.push(`| ${n + 1} | ${useTimes(u, txInfo)} | ${req.intent ? `"${cell(req.intent)}"` : '—'}${req.url ? ` (\`${cell(req.url)}\`)` : ''} | ${amt} | ${useApproval(u, thr)} | ${useOutcome(u)} | ${txs.length ? txs.map((t) => `${cell(t.label)} ${linkTx(t.hash)}`).join('<br>') : 'none (refused before any transaction)'} |`);
+    out.push(`| ${n + 1} | ${useTimes(u, txInfo)} | ${req.intent ? `"${cell(req.intent)}"` : '—'}${req.url ? ` (${code(req.url)})` : ''} | ${amt} | ${useApproval(u, thr)} | ${useOutcome(u)} | ${txs.length ? txs.map((t) => `${cell(t.label)} ${linkTx(t.hash)}`).join('<br>') : 'none (refused before any transaction)'} |`);
   });
   out.push('');
 
@@ -221,19 +252,21 @@ export function renderAuditReport({ entries, chain, state, run, txInfo, anchorCh
     '| 12(2)(a): situations that may make the system a risk, or a substantial change | Every refusal with a stable reason code (local preflight `PerTxCap`, `payee_not_bound_to_badge`, co-signer `human_approval_record_unavailable` / `approval_wrong_resource`), on-chain rejections, and every human approval. The policy itself lives in the guard; `updatePolicy` / `setPaused` emit guard events. |',
     '| 12(2)(b): data for post-market monitoring (Art. 72) | The JSONL log (machine-readable) and the "Uses" table above; on-chain guard events for every authorisation. |',
     '| 12(2)(c): monitoring of operation by the deployer (Art. 26(5)) | This report plus `npm run verify`: anyone can recheck badges, caps, approvals, settlements and the anchor without keys. |',
-    '| 12(3)(a) period of each use *(strictly required only for remote biometric identification; recorded here as good practice)* | Block times of each use\'s transactions (column 2). |',
-    '| 12(3)(b) reference data checked against | The guard\'s on-chain policy (caps, allowlist, threshold) and the CIS-8004 Agent Registry badge of the payee and of the agent. |',
-    '| 12(3)(c) input data | The task (intent, URL) and the x402 quote (amount, payee, badge). |',
-    '| 12(3)(d) the natural persons who verified the results | The owner: a ZK proof shows an adult with a valid Concordium identity who holds the owner account\'s credential approved that payment. No personal data is in the log. Concordium\'s identity layer can disclose who that is only through its legal process (Privacy Guardians, court order). |',
-    '| Art. 19 / 26(6): keep logs at least six months | Anchors and guard events stay on chain for good. The JSONL file is the operator\'s to keep; a truncated or rewritten copy fails `npm run verify` (within the limits in the README). |', '');
+    '| *Art. 12(3) applies only to the remote biometric identification systems of Annex III point 1(a). Its four items are listed here with their actual meaning; what TrustRail records is an analogue, not that requirement.* | |',
+    '| 12(3)(a): the period of each use (start and end date and time) | Analogue: block times (UTC) of the transactions each use produced (column 2 of "Uses"). |',
+    '| 12(3)(b): the reference database the input data was checked against | Analogue: what each payment was checked against — the guard\'s on-chain policy (caps, allowlist, threshold) and the CIS-8004 Agent Registry badges of payee and agent. |',
+    '| 12(3)(c): the input data for which the search led to a match | Analogue: the inputs each decision was made on — the task (intent, URL) and the x402 quote (amount, payee, badge). |',
+    '| 12(3)(d): identification of the natural persons who verified the results (Art. 14(5)) | Analogue: the approver of each large payment is identified by the owner account, pseudonymously. In this demo the identity is a Concordium **testnet** test identity with dummy attributes, and the proof (age ≥ 18 from that account\'s credential) is produced by a script holding the owner\'s testnet seed. The proof discloses no identity attributes; on mainnet the real person behind the account can be identified only through Concordium\'s identity disclosure process (identity provider and Privacy Guardians, on a lawful request). |',
+    '| Art. 19(1) / 26(6): keep the automatically generated logs for at least six months | Anchors and guard events stay on chain. The JSONL file is the operator\'s to keep; a truncated or rewritten copy fails `npm run verify` (within the limits in the README). |', '',
+    'Data protection: the proofs reveal no identity attributes, but the log keeps task inputs (intents, URLs) and account addresses verbatim. Whoever runs the agent should treat those fields as possibly personal data.', '');
 
   out.push('## Every entry', '',
     '`logged at` is the agent host\'s clock as written into the entry; the block time of each transaction is authoritative.', '',
     '| seq | logged at | event | what it means | details | on chain (block time UTC, outcome) |', '| --- | --- | --- | --- | --- | --- |');
   for (const e of entries) {
     const txs = entryTxs(e);
-    out.push(`| ${cell(e.seq)} | ${cell(e.at)} | \`${cell(e.event)}\` | ${cell(EVENT_MEANING[e.event] ?? 'event not in the standard vocabulary')} | ${entryDetails(e) || '—'} | ${txs.length ? txCell(txs, txInfo) : '—'} |`);
+    out.push(`| ${cell(e.seq)} | ${cell(e.at)} | ${code(e.event)} | ${cell(EVENT_MEANING[e.event] ?? 'event not in the standard vocabulary')} | ${entryDetails(e) || '—'} | ${txs.length ? txCell(txs, txInfo) : '—'} |`);
   }
-  out.push('', `Entry hashes: first \`${short(entries[0]?.hash ?? '')}\`, last \`${short(entries.at(-1)?.hash ?? '')}\`. Full hashes are in the JSONL file.`, '');
+  out.push('', `Entry hashes: first ${code(short(entries[0]?.hash ?? ''))}, last ${code(short(entries.at(-1)?.hash ?? ''))}. Full hashes are in the JSONL file.`, '');
   return out.join('\n');
 }

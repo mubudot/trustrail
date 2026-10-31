@@ -17,6 +17,9 @@ export const POLICY = {
 const st = readState();
 const acc = loadAccounts();
 const guard = deployedGuard();
+// verify-testnet checks the 2-of-2 wallet's keys and the settlement signatures against these (public keys only).
+st.guard.walletPublicKeys = { agentKey0: acc.wallet.keys[0].publicKey, cosignerKey1: acc.wallet.keys[1].publicKey };
+writeState(st);
 if (await guard.agent(acc.agent.address)) { console.log('already registered'); process.exit(0); }
 const r = await guard.send('registerAgent', {
   agent: acc.agent.address,

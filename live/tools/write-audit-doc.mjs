@@ -24,12 +24,15 @@ if (!offline) {
   readAt = new Date().toISOString();
   txInfo = await resolveTxInfo(grpc, [...txHashesInLog(entries), ...txHashesIn(run.steps ?? [])]);
   const anchor = (run.steps ?? []).filter((s) => s.step === 'anchor').at(-1);
-  if (anchor) {
+  if (!anchor) anchorCheck = { ok: false, reasons: ['no anchor recorded in live/state/run.json'] };
+  else {
     const g = state.guard;
     anchorCheck = await checkAuditAnchor({ grpc, guard: deployedGuard(grpc), anchorTxHash: anchor.txHash, entries,
       allowedSenders: [g.owner, g.agent, g.cosigner], coveredTxHashes: txHashesIn(run.steps) });
   }
 }
 fs.writeFileSync(new URL('../../docs/AUDIT_LOG.md', import.meta.url), renderAuditReport({ entries, chain, state, run, txInfo, anchorCheck, readAt }));
-console.log(`wrote docs/AUDIT_LOG.md (${entries.length} entries, chain ${chain.ok ? 'intact' : `broken at ${chain.brokenAt}`}${anchorCheck ? `, anchor ${anchorCheck.ok ? 'PASS' : 'FAIL'}` : ''})`);
-process.exit(chain.ok && (!anchorCheck || anchorCheck.ok) ? 0 : 1);
+const anchorOk = chain.ok && anchorCheck?.ok;
+console.log(`wrote docs/AUDIT_LOG.md (${entries.length} entries, chain ${chain.ok ? 'intact' : `broken at ${chain.brokenAt}`}, anchor ${offline ? 'not checked (offline)' : anchorOk ? 'PASS' : 'FAIL'})`);
+// Offline output is unverified: exit 0 only for an intact chain. Online: intact chain AND a passing anchor check.
+process.exit(chain.ok && (offline || anchorOk) ? 0 : 1);

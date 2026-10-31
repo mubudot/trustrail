@@ -15,6 +15,16 @@ goes to `live/state/` (committed).
 cd live && npm ci
 ```
 
+## 0. Start from empty public state (only for a deployment of your own)
+
+The checkout ships the record of *our* deployment (`live/state/`) and our Agent Cards
+(`live/agent-cards/`). The tools skip any step already recorded there, so move both aside first:
+
+```bash
+mv state state.example && mkdir -p state/approvals
+mv agent-cards agent-cards.example && mkdir agent-cards
+```
+
 ## 1. Throwaway testnet identity (Concordium testnet IdP)
 
 ```bash
@@ -37,8 +47,9 @@ node tools/fund.mjs <role>=<CCD> [...]     # the owner tops up roles that need m
 node tools/deploy-guard.mjs            # deploys live/deployed/agent_spend_guard.wasm.v1, init bound to <12802,0>
 ```
 
-The module is the exact one built by `scripts/build-wasm.sh`; rebuild and copy it into
-`live/deployed/` only if you change the contract.
+The module is the exact one built by `scripts/build-wasm.sh`. Testnet already holds it (module
+`2265603ddca0…`), so the tool reuses it and only creates your own instance; rebuild and copy a new
+module into `live/deployed/` only if you change the contract.
 
 ## 4. Register both agents in the Agent Registry (CIS-8004) through the hosted MCP
 
@@ -70,6 +81,8 @@ The same verdict is at `https://agent-registry-mcp.concordium.com/v1/check-badge
 ```bash
 node tools/register-agent-in-guard.mjs     # the contract checks balanceOf on the real registry: the owner must hold the badge
 ```
+It also records the 2-of-2 wallet's two public keys in `live/state/testnet.json`; `verify` checks
+the wallet and each settlement's signatures against them.
 
 Policy: ≤ 5 CCD per payment, ≤ 12 CCD per UTC day, above 2 CCD a verified human must approve,
 authorisations live 15 minutes, payee allowlist = the seller.
