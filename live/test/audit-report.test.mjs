@@ -58,7 +58,7 @@ test('uses: grouped per request, outcome and approver in words, settlement liste
   assert.equal(useOutcome(uses[0]), 'paid and recorded');
   assert.match(useApproval(uses[0], '2000000'), /at or below the 2 CCD threshold/);
   assert.equal(useApproval(uses[1], '2000000'), 'verified human (ZK proof, anchored)');
-  assert.match(useOutcome(uses[1]), /authorised \(Pending\)/);
+  assert.equal(useOutcome(uses[1]), 'approved by a verified human, not yet co-signed');
   assert.match(useOutcome(uses[2]), /preflight: `PerTxCap`/);
   const txs = uniqueTxs(uses[0].entries.flatMap(entryTxs));
   assert.equal(txs.filter((t) => t.hash === h(3)).length, 1);
@@ -148,7 +148,7 @@ test('a payment resumed after other requests stays with its own task', () => {
   const [a, b] = groupUses(log.entries);
   assert.deepEqual(a.entries.map((e) => e.event), ['request', 'authorized', 'human_approved', 'settled']);
   assert.deepEqual(b.entries.map((e) => e.event), ['request', 'authorized']);
-  assert.equal(useApproval(b, '2000000'), '—');
+  assert.equal(useApproval(b, '2000000'), 'awaiting approval');
   assert.match(useOutcome(b), /Pending/);
 });
 
@@ -157,4 +157,63 @@ test('offline rendering says block times were not read, instead of "nothing on c
   assert.match(md, /block times not read: offline/);
   assert.match(md, /\(no transaction\)/);
   assert.doesNotMatch(md, /agent clock; nothing on chain/);
+});
+
+test('concurrent purchases with request ids stay apart (request A, request B, quote A, authorized A)', () => {
+  const log = new AuditLog({ clock: () => 0 });
+  log.append('request', { request: 'A', intent: 'A' });
+  log.append('request', { request: 'B', intent: 'B' });
+  log.append('quote', { request: 'A', amount: '4000000', payTo: A.seller });
+  log.append('authorized', { request: 'A', authId: '1', status: 'Pending', txHash: h(1) });
+  log.append('quote', { request: 'B', amount: '500000', payTo: A.seller });
+  log.append('human_approved', { authId: '1', approveTx: h(2) });
+  log.append('refused', { request: 'B', stage: 'identity', reason: 'payee_not_bound_to_badge' });
+  const [a, b] = groupUses(log.entries);
+  assert.deepEqual(a.entries.map((e) => e.event), ['request', 'quote', 'authorized', 'human_approved']);
+  assert.deepEqual(b.entries.map((e) => e.event), ['request', 'quote', 'refused']);
+});
+
+test('approval and outcome follow the lifecycle step by step (forged-proof path)', () => {
+  const steps = [
+    ['request', { intent: 'x' }], ['quote', { amount: '4000000', payTo: A.seller }],
+    ['authorized', { authId: '2', status: 'Pending', txHash: h(1) }],
+    ['approved_without_proof', { authId: '2', approveTx: h(2) }],
+    ['refused', { authId: '2', stage: 'cosigner', reason: 'human_approval_record_unavailable', released: true }],
+  ];
+  const expect = [
+    ['—', /ended after `request`/], ['—', /ended after `quote`/],
+    ['awaiting approval', /authorised \(Pending\), not yet paid/],
+    ['owner key without a valid proof (co-signer not yet asked)', /owner key without a valid proof, not yet co-signed/],
+    ['owner key without a valid proof: refused by the co-signer', /refused \(cosigner: `human_approval_record_unavailable`\)/],
+  ];
+  const log = new AuditLog({ clock: () => 0 });
+  steps.forEach(([ev, d], i) => {
+    log.append(ev, d);
+    const [u] = groupUses(log.entries);
+    assert.equal(useApproval(u, '2000000'), expect[i][0], `approval after ${ev}`);
+    assert.match(useOutcome(u), expect[i][1], `outcome after ${ev}`);
+  });
+});
+
+test('a settlement named twice does not hide a missing block time', async () => {
+  const log = new AuditLog({ clock: () => 0 });
+  log.append('request', { intent: 'x' });
+  log.append('paid', { authId: '0', txHash: h(3) });
+  log.append('settled', { authId: '0', txHash: h(3), recordTx: h(4) });
+  const txInfo = new Map([[h(3), { finalized: true, blockHeight: 1n, blockTime: '2026-10-30T18:51:02.000Z', outcome: 'success' }], [h(4), { finalized: false }]]);
+  const md = renderAuditReport({ entries: log.entries, chain: { ok: true }, state, run: { steps: [] }, txInfo });
+  assert.match(md, /2026-10-30T18:51:02.000Z \(some transactions not finalized \/ not found\)/);
+});
+
+test('LiveAgent.buy tags every entry of one purchase with the same request id', async () => {
+  const { LiveAgent } = await import('../src/live-agent.mjs');
+  const audit = new AuditLog({ clock: () => 0 });
+  const fetchImpl = async () => ({ status: 500, headers: { get: () => null } });
+  const agent = new LiveAgent({ audit, fetchImpl, network: 'ccd:test' });
+  await agent.buy('http://x/1', { intent: 'one' });
+  await agent.buy('http://x/2', { intent: 'two' });
+  const [r1, f1, r2, f2] = audit.entries;
+  assert.deepEqual([r1.event, f1.event, r2.event, f2.event], ['request', 'refused', 'request', 'refused']);
+  assert.ok(r1.data.request && r1.data.request === f1.data.request);
+  assert.ok(r2.data.request && r2.data.request === f2.data.request && r1.data.request !== r2.data.request);
 });

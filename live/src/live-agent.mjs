@@ -9,6 +9,7 @@ import { nameOf } from '../../agent/src/policy/errors.mjs';
 import { getPaymentRequired, selectRequirements, buildTransfer, signAsKey, addSig, toJSON, payWith } from './x402-buyer.mjs';
 import { CosignRefused } from './cosigner-live.mjs';
 import { authorizeOutcome } from './guard-events.mjs';
+import { randomUUID } from 'node:crypto';
 import { enumTag } from './guard-client.mjs';
 
 /** Contract AgentView JSON -> the shape the shared JS policy engine uses. */
@@ -34,26 +35,28 @@ export class LiveAgent {
   }
 
   async buy(url, { intent = '' } = {}) {
-    this.audit.append('request', { url, intent });
+    // A per-purchase id on every entry of this purchase, so concurrent purchases stay apart in the audit record.
+    const request = randomUUID();
+    this.audit.append('request', { request, url, intent });
     const q = await getPaymentRequired(url, this.fetchImpl);
     if (q.free) return { status: 'free', data: q.body };
-    if (q.error) return this.#refuse('x402', q.error);
+    if (q.error) return this.#refuse('x402', q.error, { request });
     const req = selectRequirements(q.paymentRequired, { network: this.network });
-    if (!req) return this.#refuse('x402', 'no_acceptable_offer');
+    if (!req) return this.#refuse('x402', 'no_acceptable_offer', { request });
     const amount = BigInt(req.amount);
-    this.audit.append('quote', { url, payTo: req.payTo, amount, asset: req.asset, badge: req.extra?.payeeBadge ?? null });
+    this.audit.append('quote', { request, url, payTo: req.payTo, amount, asset: req.asset, badge: req.extra?.payeeBadge ?? null });
 
     const badgeIssue = await checkPayee({ resolver: this.resolver, badge: req.extra?.payeeBadge, payTo: req.payTo, required: this.requireVerifiedPayee });
-    if (badgeIssue) return this.#refuse('identity', badgeIssue, { payTo: req.payTo });
+    if (badgeIssue) return this.#refuse('identity', badgeIssue, { request, payTo: req.payTo });
 
     const me = await this.guard.agent(this.agent.address);
-    if (!me) return this.#refuse('preflight', 'NotAgent');
+    if (!me) return this.#refuse('preflight', 'NotAgent', { request });
     const pre = evaluate({ agent: engineRecord(me), payee: req.payTo, asset: 'CCD', amount, today: dayOf(Date.now()) });
-    if (!pre.ok) return this.#refuse('preflight', pre.error, { payTo: req.payTo, amount });
+    if (!pre.ok) return this.#refuse('preflight', pre.error, { request, payTo: req.payTo, amount });
 
     const out = await this.authorize(req, url);
-    if (out.refused) return this.#refuse('contract', out.code, { txHash: out.txHash });
-    this.audit.append('authorized', { authId: out.id, status: out.status, txHash: out.txHash });
+    if (out.refused) return this.#refuse('contract', out.code, { request, txHash: out.txHash });
+    this.audit.append('authorized', { request, authId: out.id, status: out.status, txHash: out.txHash });
     if (out.status === 'Pending') {
       this.pending.set(String(out.id), { url, requirements: req });
       return { status: 'pending_approval', authId: out.id, txHash: out.txHash };

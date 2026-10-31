@@ -117,7 +117,7 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
 agent/               Offline reference client + mock chain (zero dependencies), 27 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 44 offline tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 48 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402

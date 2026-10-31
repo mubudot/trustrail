@@ -65,6 +65,9 @@ export function entryTxs(entry) {
     .map(([k, v]) => ({ field: k, label: labels[k] ?? k, hash: String(v).toLowerCase() }));
 }
 
+/** Drop repeats of the same transaction (the settlement is named by both `paid` and `settled`). */
+export const uniqueTxs = (txs) => txs.filter((t, i) => txs.findIndex((u) => u.hash === t.hash) === i);
+
 /** Plain-language details of one entry (no transaction links; those are rendered separately). */
 export function entryDetails(entry) {
   const d = entry?.data ?? {};
@@ -84,49 +87,72 @@ export function entryDetails(entry) {
 }
 
 /**
- * Split the log into uses. Each `request` starts one. An entry that names an authorisation belongs
- * to the use in which that authorisation first appeared, so a payment approved or settled later
- * (after other requests, e.g. a resumed pending payment) stays with its own task. Other entries
- * belong to the latest use; entries before the first request form a use of their own.
+ * Split the log into uses (one per purchase). Entries carrying a `request` id (logged by
+ * LiveAgent.buy since the id was introduced) join the use that id started, so concurrent purchases
+ * stay apart. An entry naming an authorisation joins the use in which that authorisation first
+ * appeared, so a payment approved or settled later (a resumed pending payment) stays with its task.
+ * Older entries without either fall back to the latest `request`; entries before any request form a
+ * use of their own.
  */
 export function groupUses(entries) {
   const uses = [];
+  const byRequest = new Map();
   const byAuth = new Map();
+  const keyOf = (v) => (v === undefined || v === null || v === '' ? null : String(v));
   for (const e of entries) {
-    if (e.event === 'request' || uses.length === 0) uses.push({ entries: [] });
-    const id = e?.data?.authId;
-    const key = id === undefined || id === null ? null : String(id);
-    if (key !== null && byAuth.has(key)) { byAuth.get(key).entries.push(e); continue; }
-    if (key !== null) byAuth.set(key, uses.at(-1));
-    uses.at(-1).entries.push(e);
+    const rid = keyOf(e?.data?.request);
+    const aid = keyOf(e?.data?.authId);
+    let use;
+    if (e.event === 'request' || uses.length === 0) {
+      use = { entries: [] };
+      uses.push(use);
+      if (rid !== null && e.event === 'request') byRequest.set(rid, use);
+    }
+    if (aid !== null && byAuth.has(aid)) use = byAuth.get(aid);
+    else if (rid !== null && byRequest.has(rid)) use = byRequest.get(rid);
+    use ??= uses.at(-1);
+    if (aid !== null && !byAuth.has(aid)) byAuth.set(aid, use);
+    use.entries.push(e);
   }
   return uses;
 }
 
-/** One-line outcome of a use. */
+/** State after each lifecycle event; the use's outcome is the state after its last lifecycle event. */
+const STATE_AFTER = Object.freeze({
+  authorized: (e) => `authorised (${cell(e.data?.status ?? '?')}), not yet paid`,
+  human_approved: () => 'approved by a verified human, not yet co-signed',
+  approved_without_proof: () => 'approved by the owner key without a valid proof, not yet co-signed',
+  approved_with_replayed_proof: () => 'approved by the owner key with a replayed proof, not yet co-signed',
+  cosigned: () => 'co-signed, not yet settled',
+  paid: () => 'paid, not yet recorded in the guard',
+  settlement_unknown: () => 'settlement outcome unknown',
+  settlement_record_failed: () => 'paid, but recording the settlement in the guard failed',
+  settled: () => 'paid and recorded',
+  refused: (e) => `refused (${cell(e.data?.stage ?? '?')}: ${code(e.data?.reason ?? '?')})`,
+});
+
+/** One-line outcome of a use, from the last lifecycle event it logged. */
 export function useOutcome(use) {
-  const ev = use.entries;
-  const refused = ev.find((e) => e.event === 'refused');
-  if (refused) return `refused (${cell(refused.data?.stage ?? '?')}: ${code(refused.data?.reason ?? '?')})`;
-  if (ev.some((e) => e.event === 'settled')) return 'paid and recorded';
-  if (ev.some((e) => e.event === 'paid')) return 'paid, not yet recorded in the guard';
-  const auth = ev.findLast((e) => e.event === 'authorized');
-  if (auth) return `authorised (${cell(auth.data?.status ?? '?')}), no payment logged`;
-  return ev.length ? `ended after ${code(ev.at(-1).event)}` : 'empty';
+  const last = use.entries.findLast((e) => STATE_AFTER[e.event]);
+  if (last) return STATE_AFTER[last.event](last);
+  return use.entries.length ? `ended after ${code(use.entries.at(-1).event)}` : 'empty';
 }
 
-/** Who/what approved a use, in words. */
+/** Who/what approved a use, in words. A refusal is claimed only once a refusal is logged. */
 export function useApproval(use, thresholdMicro) {
   const has = (n) => use.entries.some((e) => e.event === n);
+  const cosignerRefused = use.entries.some((e) => e.event === 'refused' && e.data?.stage === 'cosigner');
+  const then = cosignerRefused ? ': refused by the co-signer' : (has('cosigned') ? ', co-signed' : ' (co-signer not yet asked)');
   if (has('human_approved')) return 'verified human (ZK proof, anchored)';
-  if (has('approved_without_proof')) return 'owner key without proof: refused by co-signer';
-  if (has('approved_with_replayed_proof')) return 'owner key with replayed proof: refused by co-signer';
+  if (has('approved_without_proof')) return `owner key without a valid proof${then}`;
+  if (has('approved_with_replayed_proof')) return `owner key with a replayed proof${then}`;
   const auth = use.entries.find((e) => e.event === 'authorized');
   if (auth?.data?.status === 'Approved') {
     const amt = use.entries.find((e) => e.data?.amount !== undefined)?.data?.amount;
     return thresholdMicro !== undefined && amt !== undefined && /^\d+$/.test(String(amt)) && BigInt(amt) <= BigInt(thresholdMicro)
       ? `policy (at or below the ${ccd(thresholdMicro)} threshold)` : 'policy';
   }
+  if (auth?.data?.status === 'Pending') return 'awaiting approval';
   return '—';
 }
 
@@ -155,9 +181,6 @@ export async function resolveTxInfo(grpc, hashes) {
   return out;
 }
 
-/** Drop repeats of the same transaction (the settlement is named by both `paid` and `settled`). */
-export const uniqueTxs = (txs) => txs.filter((t, i) => txs.findIndex((u) => u.hash === t.hash) === i);
-
 const txCell = (txs, info) => txs.map((t) => {
   const i = info?.get(t.hash);
   const when = i?.finalized ? ` — ${i.blockTime}, ${i.outcome}` : (info ? ' — not finalized / not found' : '');
@@ -165,9 +188,9 @@ const txCell = (txs, info) => txs.map((t) => {
 }).join('<br>');
 
 function useTimes(use, info) {
-  const txs = use.entries.flatMap(entryTxs);
+  const txs = uniqueTxs(use.entries.flatMap(entryTxs));
   const times = txs.map((t) => info?.get(t.hash)).filter((i) => i?.finalized).map((i) => i.blockTime).sort();
-  if (times.length) return `${times[0] === times.at(-1) ? times[0] : `${times[0]} → ${times.at(-1)}`}${times.length < new Set(txs.map((t) => t.hash)).size ? ' (some transactions not finalized / not found)' : ''}`;
+  if (times.length) return `${times[0] === times.at(-1) ? times[0] : `${times[0]} → ${times.at(-1)}`}${times.length < txs.length ? ' (some transactions not finalized / not found)' : ''}`;
   const first = cell(use.entries[0]?.at ?? '?');
   const last = cell(use.entries.at(-1)?.at ?? '?');
   const clock = `agent clock ${first === last ? first : `${first} → ${last}`}`;
