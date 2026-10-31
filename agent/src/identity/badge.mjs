@@ -41,7 +41,13 @@ export class HostedBadgeResolver {
 /** Returns null when the payee is acceptable, else a refusal reason. */
 export async function checkPayee({ resolver, badge, payTo, required }) {
   if (!badge) return required ? 'payee_has_no_badge' : null;
-  const r = await resolver.resolve(badge);
+  let r;
+  try {
+    r = await resolver.resolve(badge);
+  } catch {
+    return 'payee_badge_unavailable'; // registry unreachable or malformed: fail closed, as a stable refusal
+  }
+  if (!r || typeof r !== 'object') return 'payee_badge_unavailable';
   if (r.issue) return r.issue;
   if (!r.valid) return 'payee_badge_invalid';
   if (!r.active) return 'payee_badge_revoked';

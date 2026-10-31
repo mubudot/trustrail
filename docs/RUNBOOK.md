@@ -9,8 +9,8 @@ The deployment in [TESTNET.md](TESTNET.md) was made exactly this way. To only **
 step 9: `npm run verify`, `npm run check-badge` and `npm run audit:doc` need no keys.
 
 For reproducible attack demonstrations, see [ATTACKS.md](ATTACKS.md): from the repository root,
-`bash scripts/attacks.sh` runs the offline contract and Node suites. Tests: **156 total** — contract
-9 unit + 25 integration = 34, agent 31, live 91. The Node runner reports 32 attacks blocked and
+`bash scripts/attacks.sh` runs the offline contract and Node suites. Tests: **158 total** — contract
+9 unit + 25 integration = 34, agent 33, live 91. The Node runner reports 32 attacks blocked and
 4 controls passed; the 7 Rust attack tests also print 27 refusals and 3 controls. Configure your
 Rust toolchain and install the existing live dependencies first. `cd live && npm run attacks --
 --testnet` runs optional read-only checks, with no keys or transactions.

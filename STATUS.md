@@ -26,9 +26,9 @@
 
 ## Tests
 - contract: 9 unit + 25 integration = 34 (`cargo test --offline`, after `scripts/build-wasm.sh`)
-- agent (offline reference client + mock chain): 31 (`npm test`)
+- agent (offline reference client + mock chain): 33 (`npm test`)
 - live adapters (offline, fakes for chain): 91 (`npm test`)
-- Total: **156 tests**, all passing. [Attack suite](docs/ATTACKS.md): `bash scripts/attacks.sh`;
+- Total: **158 tests**, all passing. [Attack suite](docs/ATTACKS.md): `bash scripts/attacks.sh`;
   Node runner: **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. Seven Rust attack tests
   additionally print 27 contract refusals and 3 legitimate controls.
 

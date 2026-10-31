@@ -27,7 +27,7 @@ succeed. Unexpected acceptance, a different refusal, an exception or a failed co
 auto-approved payment, an active badge with its original card, and settlement/audit verification.
 The Rust tests also demonstrate legitimate pre-expiry, unpause and new-generation operations.
 
-Measured suites: **156 tests** — contract **9 unit + 25 integration = 34**, agent **31**, live
+Measured suites: **158 tests** — contract **9 unit + 25 integration = 34**, agent **33**, live
 **91**. The Node runner prints **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. The 7 new
 Rust tests print 27 contract refusals and 3 controls (additional to the Node summary).
 

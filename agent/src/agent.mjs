@@ -12,6 +12,7 @@ import { buildAgentSignedTx, parsePaymentRequired, selectRequirements, submitPay
 export class TrustedAgent {
   constructor({ account, agentKey, guard, cosigner, resolver, audit, fetchImpl, nonceOf, network, clock = () => Date.now(), requireVerifiedPayee = true }) {
     Object.assign(this, { account, agentKey, guard, cosigner, resolver, audit, fetchImpl, nonceOf, network, clock, requireVerifiedPayee });
+    this.walletLock = Promise.resolve(); // one payment per wallet at a time (nonce allocation -> settlement)
     this.pending = new Map(); // authId -> {url, requirements}
   }
 
@@ -66,7 +67,14 @@ export class TrustedAgent {
     return this.#pay(authId, p.url, p.requirements);
   }
 
-  async #pay(authId, url, requirements) {
+  /** Serialises payments from the wallet: nonce allocation -> co-sign (async) -> settle cannot interleave. */
+  #pay(authId, url, requirements) {
+    const run = this.walletLock.then(() => this.#payNow(authId, url, requirements));
+    this.walletLock = run.catch(() => {});
+    return run;
+  }
+
+  async #payNow(authId, url, requirements) {
     const auth = this.guard.authorization(authId)?.auth;
     if (!auth) return this.#refuse('pay', 'unknown_authorization', { authId });
     const wallet = this.guard.agent(this.account)?.record.wallet;

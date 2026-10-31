@@ -157,3 +157,23 @@ test('co-signer re-checks the payee badge itself, even when the buyer skips its 
   assert.equal(out.released, true);
   assert.equal(w.ledger.account(ACCOUNTS.dataSeller)?.balance ?? 0n, 0n);
 });
+
+test('concurrent purchases from one wallet are serialised (async co-signer): both paid, nonces in order', async () => {
+  const w = createWorld();
+  const [a, b] = await Promise.all([w.agent.buy('https://data.example/weather'), w.agent.buy('https://data.example/weather')]);
+  assert.deepEqual([a.status, b.status], ['paid', 'paid']);
+});
+
+test('registry unreachable during resume or co-signing: stable refusal and the authorisation is released', async () => {
+  const w = createWorld();
+  const r = await w.agent.buy('https://data.example/dataset');
+  w.humanApprove(r.authId);
+  const down = { resolve: async () => { throw new Error('fetch failed'); } };
+  w.agent.resolver = down;
+  w.cosigner.resolver = down;
+  const out = await w.agent.resume(r.authId);
+  assert.deepEqual([out.status, out.stage, out.reason, out.released], ['refused', 'identity', 'payee_badge_unavailable', true]);
+  assert.equal(w.guard.authorization(r.authId).auth.status, 'Cancelled');
+  const r2 = await w.agent.buy('https://data.example/dataset');
+  assert.equal(r2.reason, 'payee_badge_unavailable');
+});
