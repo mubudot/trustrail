@@ -14,3 +14,8 @@ zero-knowledge proof that the identity-verified owner approved that exact paymen
 wallet is co-signed only after that proof re-verifies against the chain. Both agents carry Verified
 by Concordium badges (CIS-8004), settlement is sponsored x402, and approval records plus the agent's
 audit log are anchored on chain. Already live on testnet: guard <13037,0>.
+
+Supporting evidence: [the offline attack suite](ATTACKS.md), runnable from the repository root
+with `bash scripts/attacks.sh`. **152 tests pass** — contract 34 (9 unit + 25 integration), agent
+29, live 89. The Node runner demonstrates 32 blocked attacks and 4 passing legitimate controls;
+the Rust attack tests exercise the real contract Wasm.

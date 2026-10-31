@@ -24,8 +24,13 @@ export class HostedBadgeResolver {
     if (!res.ok) return { valid: false, active: false };
     const j = await res.json();
     const rec = j.on_chain ?? j.agent ?? j.record ?? j.results?.[0] ?? {};
+    // Fail closed on contradictory registry responses, even if the aggregate verdict says valid.
+    const cardHashMismatch = j.checks?.hash_matches_on_chain === false
+      || (j.card_sha256 !== undefined && rec.metadata_hash_hex !== undefined
+        && j.card_sha256 !== rec.metadata_hash_hex);
     return {
       valid: j.badge_valid === true,
+      issue: cardHashMismatch ? 'payee_card_hash_mismatch' : null,
       active: rec.status === 'Active',
       owner: rec.owner_account ?? rec.owner,
       agentWallet: rec.agent_wallet ?? rec.agentWallet,
@@ -37,6 +42,7 @@ export class HostedBadgeResolver {
 export async function checkPayee({ resolver, badge, payTo, required }) {
   if (!badge) return required ? 'payee_has_no_badge' : null;
   const r = await resolver.resolve(badge);
+  if (r.issue) return r.issue;
   if (!r.valid) return 'payee_badge_invalid';
   if (!r.active) return 'payee_badge_revoked';
   if (r.agentWallet !== payTo && r.owner !== payTo) return 'payee_not_bound_to_badge';

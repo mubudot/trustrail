@@ -6,6 +6,11 @@ real documents, no wallet app), and the accounts, faucet CCD, guard contract, CI
 x402 payments and audit anchors were all created by the scripts in [RUNBOOK.md](RUNBOOK.md).
 Nothing below involves mainnet or money.
 
+You can review the protections locally with `bash scripts/attacks.sh` from the repository root
+([attack map and setup](ATTACKS.md)). Current suites: **152 passing tests** — contract 34
+(9 unit + 25 integration), agent 29, live 89. The Node attack demonstration reports
+**32 attacks BLOCKED, 4 controls PASS, 0 unexpected**.
+
 What is left needs your account or your decision:
 
 1. **Checkpoint 1, by Mon 23 Nov 07:59 Taipei (Sun 22 Nov 23:59 UTC).** On the Encode dashboard

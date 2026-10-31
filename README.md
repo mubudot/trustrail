@@ -51,7 +51,11 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
                                  8. guard.recordSettlement(id, txHash); audit entry; anchorAudit(head)
 ```
 
-## What stops what (all demonstrated on testnet)
+## What stops what
+
+Run every attack offline with `bash scripts/attacks.sh`. The [attack suite](docs/ATTACKS.md)
+maps each attack to its production check, exact refusal and regression test, with legitimate
+controls and optional read-only testnet checks.
 
 | The agent's logic misbehaves (prompt injection, a bug, skipped client checks) and tries to … | Stopped by |
 | --- | --- |
@@ -114,12 +118,12 @@ seller (x402, badge #978)        buyer agent (badge #977, owned by the verified 
 ## Layout
 
 ```
-contract/            Rust smart contract agent_spend_guard (concordium-std 11), 27 tests
+contract/            Rust smart contract agent_spend_guard (concordium-std 11), 34 tests (9 unit + 25 integration)
   src/spend.rs       authorize / approve(id, human_proof) / reject / cancel / commitPayment / recordSettlement
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
-agent/               Offline reference client + mock chain (zero dependencies), 27 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 49 offline tests
+agent/               Offline reference client + mock chain (zero dependencies), 29 tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 89 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402
@@ -136,11 +140,15 @@ docs/USER_STEPS.md   what only the entrant has to do (dashboard, publishing)
 
 ## Run it
 
+One command for the offline contract + co-signer [attack demonstrations](docs/ATTACKS.md):
+`bash scripts/attacks.sh` (existing dependencies installed and your Rust toolchain configured).
+
 ```bash
 # offline (no keys, no network)
 cd agent && npm test && npm run demo:mock
 cd contract && cargo test            # after ./scripts/build-wasm.sh (Rust 1.99.1 + wasm32v1-none)
 cd live && npm ci && npm test
+cd live && npm run attacks          # Node attacks only; add -- --json for JSON output
 
 # read-only checks of the live testnet deployment (no keys)
 cd live && npm run verify       # 23 checks: badges, guard, ZK approval, settlements, audit anchor
@@ -150,6 +158,9 @@ npm run audit:doc               # regenerate docs/AUDIT_LOG.md from live/state/a
 
 Reproducing the deployment from scratch (own throwaway testnet identity, accounts, faucet,
 contract, badges, demo) is scripted in `live/tools/`, step by step in [docs/RUNBOOK.md](docs/RUNBOOK.md).
+The suites contain **152 tests**: contract 34, agent 29, live 89. The offline Node attack runner
+reports **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**; the root command also runs 7 Rust
+attack tests that print 27 contract refusals and 3 legitimate controls.
 
 ## Concordium components used
 

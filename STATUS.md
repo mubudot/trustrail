@@ -25,11 +25,19 @@
 - Step-by-step reproduction: docs/RUNBOOK.md. What only the entrant must do: docs/USER_STEPS.md.
 
 ## Tests
-- contract: 9 unit + 18 integration (`cargo test`, after `scripts/build-wasm.sh`)
-- agent (offline reference client + mock chain): 27 (`npm test`)
-- live adapters (offline, fakes for chain): 49 (`npm test`)
+- contract: 9 unit + 25 integration = 34 (`cargo test --offline`, after `scripts/build-wasm.sh`)
+- agent (offline reference client + mock chain): 29 (`npm test`)
+- live adapters (offline, fakes for chain): 89 (`npm test`)
+- Total: **152 tests**, all passing. [Attack suite](docs/ATTACKS.md): `bash scripts/attacks.sh`;
+  Node runner: **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. Seven Rust attack tests
+  additionally print 27 contract refusals and 3 legitimate controls.
 
 ## Changes in this round
+- Added offline attacks through the production co-signer, real approval/ZK verifier, badge client,
+  mock guard, audit anchor and settlement verifier, plus real Wasm contract attacks. Read-only
+  testnet checks verify the real approval and refuse replay/card tampering without keys or sends.
+- Badge client now refuses explicit card-hash failures and contradictory fetched/pinned hashes
+  even if the hosted registry's aggregate `badge_valid` verdict says true.
 - Contract: `approve` now takes `{id, human_proof}` and stores the Verification Audit Record anchor
   hash in the authorisation (`Approved` event carries it); new `anchorAudit` entrypoint +
   `AuditAnchored` event (owner, registered agent or co-signer only).

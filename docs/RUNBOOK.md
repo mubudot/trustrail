@@ -8,6 +8,13 @@ the hosted Agent Registry MCP (`https://agent-registry-mcp.concordium.com/mcp`) 
 The deployment in [TESTNET.md](TESTNET.md) was made exactly this way. To only **check** it, skip to
 step 9: `npm run verify`, `npm run check-badge` and `npm run audit:doc` need no keys.
 
+For reproducible attack demonstrations, see [ATTACKS.md](ATTACKS.md): from the repository root,
+`bash scripts/attacks.sh` runs the offline contract and Node suites. Tests: **152 total** — contract
+9 unit + 25 integration = 34, agent 29, live 89. The Node runner reports 32 attacks blocked and
+4 controls passed; the 7 Rust attack tests also print 27 refusals and 3 controls. Configure your
+Rust toolchain and install the existing live dependencies first. `cd live && npm run attacks --
+--testnet` runs optional read-only checks, with no keys or transactions.
+
 Keys and the throwaway identity go to `live/.secrets/` (gitignored, mode 600). The public record
 goes to `live/state/` (committed).
 
