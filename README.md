@@ -6,8 +6,9 @@ approved *that exact payment* — with the proof anchored on chain for audit.**
 
 Live on Concordium **testnet**: guard contract [<13037,0>](https://ccdexplorer.io/testnet/instance/13037/0),
 Verified-by-Concordium badges for both agents, real x402 settlements, ZK approval records and an
-anchored audit log. Every link: [docs/TESTNET.md](docs/TESTNET.md). Re-check it yourself without any
-key: `cd live && npm ci && npm run verify`.
+anchored audit log. Every link: [docs/TESTNET.md](docs/TESTNET.md). The agent's Art. 12-style audit
+record, one CCDExplorer link per transaction: [docs/AUDIT_LOG.md](docs/AUDIT_LOG.md). Re-check it
+yourself without any key: `cd live && npm ci && npm run verify`.
 
 ## Why this is different from "caps + an approve button"
 
@@ -29,7 +30,8 @@ the owner key can flip. TrustRail makes the human part *cryptographic and specif
    authorisation (`human_proof`) and in a RegisterData anchor; the agent's hash-chained audit log
    head is anchored with `anchorAudit`. That is an EU AI Act Art. 12-style record with a lawful
    route back to an accountable person (Concordium identity disclosure only via Privacy Guardians
-   and a court order).
+   and a court order). The readable record, with block times, an on-chain anchor check and an
+   Art. 12 mapping, is [docs/AUDIT_LOG.md](docs/AUDIT_LOG.md) (`npm run audit:doc` regenerates it).
 
 ## How a payment flows
 
@@ -115,15 +117,19 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
 agent/               Offline reference client + mock chain (zero dependencies), 27 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 34 offline tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 39 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402
   src/guard-client.mjs     schema-typed guard calls;  src/registry-mcp.mjs  hosted Agent Registry MCP
-  tools/                   identity, accounts, faucet, deploy, badges/cards, verify-testnet, doc generator
+  src/audit-anchor.mjs     anchor check;  src/audit-report.mjs  Art. 12-style audit record (docs/AUDIT_LOG.md)
+  tools/                   identity, accounts, faucet, deploy, badges/cards, check-badge, verify-testnet, doc generators
   demo/testnet.mjs         the live scenarios;  state/  public deployment record + evidence
   deployed/                the exact module + schema deployed on testnet
 docs/TESTNET.md      every address and transaction with CCDExplorer links
+docs/AUDIT_LOG.md    the agent's audit log as an Art. 12-style record (CCDExplorer links, block times)
+docs/RUNBOOK.md      testnet from scratch: identity, accounts, guard, CIS-8004 badges, x402 payments
+docs/USER_STEPS.md   what only the entrant has to do (dashboard, publishing)
 ```
 
 ## Run it
@@ -134,12 +140,14 @@ cd agent && npm test && npm run demo:mock
 cd contract && cargo test            # after ./scripts/build-wasm.sh (Rust 1.99.1 + wasm32v1-none)
 cd live && npm ci && npm test
 
-# read-only check of the live testnet deployment (no keys)
-cd live && npm run verify
+# read-only checks of the live testnet deployment (no keys)
+cd live && npm run verify       # 23 checks: badges, guard, ZK approval, settlements, audit anchor
+npm run check-badge             # both badges through the hosted Agent Registry MCP (check_badge)
+npm run audit:doc               # regenerate docs/AUDIT_LOG.md from live/state/audit.jsonl + chain
 ```
 
 Reproducing the deployment from scratch (own throwaway testnet identity, accounts, faucet,
-contract, badges, demo) is scripted in `live/tools/` and described in [STATUS.md](STATUS.md).
+contract, badges, demo) is scripted in `live/tools/`, step by step in [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ## Concordium components used
 

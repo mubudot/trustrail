@@ -62,7 +62,7 @@ export function lifecycleGaps(auth, entries) {
 }
 
 /** A field holds a transaction hash when it is named `txHash` or ends in `Tx` (e.g. approveTx, cancelTx, recordAnchorTx). */
-const isTxField = (k) => k === 'txHash' || /Tx$/.test(k);
+export const isTxField = (k) => k === 'txHash' || /Tx$/.test(k);
 
 /** Every transaction hash named by a list of records (log entries' `data`, or run.json steps). Malformed values are kept so they fail the height check. */
 export function txHashesIn(records) {

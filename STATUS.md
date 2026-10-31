@@ -1,4 +1,4 @@
-# Status (2026-10-31)
+# Status (2026-10-31, updated 17:30 Taipei)
 
 ## Live on Concordium testnet (details and links: docs/TESTNET.md)
 - Throwaway test identity from the **Concordium testnet IdP** (its own dummy attributes, no real
@@ -18,11 +18,16 @@
   approval), forged-proof and replayed-proof approvals refused by the co-signer, preflight and
   on-chain cap refusals, badge-impostor refusal, audit head anchored.
 - `npm run verify` (read-only) re-checks all of it: 23 checks pass.
+- `npm run check-badge` asks the hosted Agent Registry MCP (`check_badge`) for both badges: VALID.
+- `npm run audit:doc` writes docs/AUDIT_LOG.md: the agent's hash-chained audit log as an Art. 12-style
+  record (uses, inputs, approver, outcome, CCDExplorer link + block time for every transaction,
+  anchor check against chain, Art. 12 mapping).
+- Step-by-step reproduction: docs/RUNBOOK.md. What only the entrant must do: docs/USER_STEPS.md.
 
 ## Tests
 - contract: 9 unit + 18 integration (`cargo test`, after `scripts/build-wasm.sh`)
 - agent (offline reference client + mock chain): 27 (`npm test`)
-- live adapters (offline, fakes for chain): 34 (`npm test`)
+- live adapters (offline, fakes for chain): 39 (`npm test`)
 
 ## Changes in this round
 - Contract: `approve` now takes `{id, human_proof}` and stores the Verification Audit Record anchor

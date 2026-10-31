@@ -17,6 +17,8 @@
   "scripts": {
     "test": "node --test \"test/**/*.test.mjs\"",
     "verify": "node tools/verify-testnet.mjs",
-    "demo": "node demo/testnet.mjs"
+    "demo": "node demo/testnet.mjs",
+    "audit:doc": "node tools/write-audit-doc.mjs",
+    "check-badge": "node tools/check-badge.mjs"
   }
 }
