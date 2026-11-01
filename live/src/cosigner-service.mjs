@@ -71,6 +71,7 @@ export function createCosignerService({ config, token }) {
         || !object(input.signableJSON) || !object(input.requirements)
         || typeof input.resourceUrl !== 'string' || input.resourceUrl.length > 2048) fail('invalid_arguments');
       if (input.requirements.network !== network) fail('network_mismatch');
+      // Persist the checked transaction's nonce, digest and signed expiry before commitPayment.
       const out = await nonces.run(wallet, () => cosigner.cosignWithReceipt({ ...input, authId: BigInt(authId) },
         { beforeCommit: (reservation) => nonces.reserve(reservation) }));
       reply(200, { status: 'signed', signature: out.signature, receipt: { commitTx: out.commitTx, digest: out.digest } });

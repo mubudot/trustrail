@@ -117,7 +117,7 @@ export class LiveCosigner {
       if (issue) no(issue);
     }
 
-    await beforeCommit({ authId, wallet: rec.wallet, nonce: BigInt(h.nonce.value ?? h.nonce), digest });
+    await beforeCommit({ authId, wallet: rec.wallet, nonce: BigInt(h.nonce.value ?? h.nonce), digest, notAfterS: expS });
     let commitTx;
     try {
       const c = await this.guard.send('commitPayment', { id: BigInt(authId), digest }, { sender: this.account.address, signer: this.account.signer });

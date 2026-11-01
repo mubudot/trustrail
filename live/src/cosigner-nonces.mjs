@@ -18,9 +18,11 @@ export class WalletNonces {
     let saved;
     try { saved = JSON.parse(readFileSync(file, 'utf8')); }
     catch (e) { if (e.code === 'ENOENT') return; throw new Error('invalid_wallet_nonce_journal'); }
-    if (saved?.version !== 1 || saved.scope !== scope || !Array.isArray(saved.reservations)) throw new Error('invalid_wallet_nonce_journal');
+    // V1 has no signed transfer expiry; an authorization deadline cannot safely replace it.
+    if (saved?.version === 1) throw new Error('unsupported_wallet_nonce_journal_version');
+    if (saved?.version !== 2 || saved.scope !== scope || !Array.isArray(saved.reservations)) throw new Error('invalid_wallet_nonce_journal');
     for (const r of saved.reservations) {
-      if (!r || typeof r.wallet !== 'string' || !idOK(r.nonce) || !idOK(r.authId)
+      if (!r || typeof r.wallet !== 'string' || !idOK(r.nonce) || !idOK(r.authId) || !idOK(r.notAfterS)
         || typeof r.digest !== 'string' || !/^[0-9a-f]{64}$/.test(r.digest)
         || this.reservations.has(key(r))) throw new Error('invalid_wallet_nonce_journal');
       AccountAddress.fromBase58(r.wallet);
@@ -41,7 +43,7 @@ export class WalletNonces {
       const temp = `${this.file}.tmp`;
       const fd = openSync(temp, 'w', 0o600);
       try {
-        writeFileSync(fd, JSON.stringify({ version: 1, scope: this.scope, reservations: [...next.values()] }) + '\n');
+        writeFileSync(fd, JSON.stringify({ version: 2, scope: this.scope, reservations: [...next.values()] }) + '\n');
         fsyncSync(fd);
       } finally { closeSync(fd); }
       renameSync(temp, this.file);
@@ -49,26 +51,40 @@ export class WalletNonces {
     this.reservations = next;
   }
 
-  // A failed read, expired authorization or lost commit response never frees a nonce.
+  // Only node evidence or a precommit cancellation can free a nonce; failed reads retain it.
   async reconcile(wallet) {
     const outstanding = [...this.reservations.values()].filter(r => r.wallet === wallet);
     if (!outstanding.length) return;
-    const { nonce } = await this.guard.grpc.getNextAccountNonce(AccountAddress.fromBase58(wallet));
+    // The SDK's getBlockInfo() without a hash selects lastFinal, never the local/buyer clock.
+    const [{ nonce }, { blockSlotTime }] = await Promise.all([
+      this.guard.grpc.getNextAccountNonce(AccountAddress.fromBase58(wallet)),
+      this.guard.grpc.getBlockInfo(),
+    ]);
     const nextNonce = BigInt(nonce.value ?? nonce);
+    const finalizedMs = blockSlotTime instanceof Date ? blockSlotTime.getTime() : NaN;
+    if (!Number.isSafeInteger(finalizedMs) || finalizedMs < 0) throw new Error('invalid_finalized_block_time');
     const next = new Map(this.reservations);
     for (const r of outstanding) {
+      if (nextNonce > BigInt(r.nonce) || BigInt(finalizedMs) > BigInt(r.notAfterS) * 1000n) {
+        next.delete(key(r));
+        continue;
+      }
       const view = await this.guard.authorization(BigInt(r.authId));
-      if (nextNonce > BigInt(r.nonce) || view && ['Settled', 'Cancelled'].includes(enumTag(view.auth.status))) next.delete(key(r));
+      // contract/src/spend.rs cancel accepts only Pending/Approved; signing requires a successful
+      // commitPayment first, so a Cancelled authorization cannot have a released signature.
+      // Settled is buyer-writable via recordSettlement and proves no wallet nonce consumption.
+      if (view && enumTag(view.auth.status) === 'Cancelled') next.delete(key(r));
     }
     if (next.size !== this.reservations.size) this.#save(next);
   }
 
   // Called under the wallet lock, after all signing checks and BEFORE the chain commit.
-  async reserve({ wallet, nonce, authId, digest }) {
+  async reserve({ wallet, nonce, authId, digest, notAfterS }) {
     await this.reconcile(wallet);
-    const r = { wallet, nonce: String(nonce), authId: String(authId), digest };
+    const r = { wallet, nonce: String(nonce), authId: String(authId), digest, notAfterS: String(notAfterS) };
+    if (!idOK(r.notAfterS)) throw new Error('invalid_wallet_nonce_expiry');
     const existing = this.reservations.get(key(r));
-    if (existing && (existing.authId !== r.authId || existing.digest !== digest)) throw new CosignRefused('wallet_nonce_in_use');
+    if (existing && (existing.authId !== r.authId || existing.digest !== digest || existing.notAfterS !== r.notAfterS)) throw new CosignRefused('wallet_nonce_in_use');
     const next = new Map(this.reservations);
     next.set(key(r), r);
     this.#save(next);

@@ -85,14 +85,32 @@ the guard's atomic `commitPayment` ensures only one signature for the **same aut
 across replicas. It does not coordinate wallet nonces across different authorizations.
 
 Within one signing instance, signing and release are serialized per wallet. Before committing,
-the service reserves the wallet nonce for its authorization and digest; another authorization at
-that nonce receives `wallet_nonce_in_use` before `commitPayment`. Reservations remain outstanding
-through lost responses and expiry. They clear only when the guard reports Settled/Cancelled or
-the node's next wallet nonce has advanced past the reserved nonce. `nonceStateFile` is written
-atomically before commit and restored on restart; it stores only public wallet addresses, nonces,
-authorization ids and digests, scoped to the configured network, guard and agent. Keep this file
-across restarts, reconcile existing commitments when provisioning a journal, and never delete it
-to bypass a refusal. A journal write failure prevents committing.
+the service reserves the wallet nonce for its authorization, digest and exact signed transfer
+header expiry (`notAfterS`, decimal epoch seconds); another authorization at that nonce receives
+`wallet_nonce_in_use` before `commitPayment`. A reservation clears only when the node's next wallet
+nonce advances past it, the last finalized block's slot time is **strictly past the signed transfer
+expiry**, or the guard reports Cancelled. The contract allows cancellation only before commitment,
+when no co-signer signature has been released. A buyer can write a Settled record with an invented
+hash, so Settled alone leaves the reservation in place.
+
+Expiry recovery is automatic during reconciliation on a fresh signing or release request, including
+after a service restart. The service reads finalized time from the node via gRPC; local time,
+buyer-supplied time and the authorization deadline cannot free a nonce. Equality with the signed
+expiry retains the reservation. A failed or invalid chain-time read also retains it. The expired
+transfer can no longer be included once finalized time passes its expiry, but its old committed
+budget stays booked; recovery never changes the guard's accounting.
+
+`nonceStateFile` uses **journal version 2**, written atomically before commit and restored on restart.
+It stores only public wallet addresses, nonces, authorization ids, digests and signed expiries,
+scoped to the configured network, guard and agent. Keep this file across restarts and never delete
+it to bypass a refusal. A journal write failure prevents committing.
+
+**Version 1 journals are rejected at startup** with `unsupported_wallet_nonce_journal_version`;
+there is no automatic migration because those entries lack the exact signed expiry. Preserve the
+old journal. To provision version 2, recover each original transfer, verify its digest against the
+entry and add its exact header expiry; omit an entry only after independently verifying nonce
+consumption or cancellation. Do not start with a replacement journal while any entry is unresolved,
+and never substitute an authorization deadline for a signed expiry.
 
 **Before mainnet, run a single signing instance for each wallet, or add a shared lock and durable
 reservation store spanning every replica.** The journal is for one writer and does not supply a
@@ -104,8 +122,9 @@ Offline tests use generated keys, the actual approval verifier with captured pub
 responses, mock guard transitions, HTTP on loopback, and fake settlement responses. They cover
 small and proof-required buyer payments, forged proofs, pinned settings, authentication,
 key separation, cancellation receipts, malformed/lost responses, a same-authorization replica race,
-different-authorization nonce conflicts within one service, settlement reconciliation and journal
-recovery after restart. They do not establish
+different-authorization nonce conflicts within one service, forged settlement records, finalized-time
+expiry recovery after lost responses and restart, failed chain-time reads and journal version rejection.
+They do not establish
 separate host custody, a live owner wallet integration or a new testnet settlement.
 
 ## Recovery and operations
@@ -113,8 +132,9 @@ separate host custody, a live owner wallet integration or a new testnet settleme
 - `settlement_unknown` (the facilitator did not confirm) and `paid_unrecorded` (paid, but
   `recordSettlement` failed) are already reported by the buyer (`live/src/live-agent.mjs`) and kept in
   the audit log with any transaction hash. In production an operator job reconciles them against the
-  chain before the agent may buy again; committed authorisations stay booked against the daily cap
-  until then.
+  chain before the agent may buy again. Service nonce recovery after the signed expiry uses finalized
+  chain time automatically as described above; committed authorisations stay booked under the guard's
+  existing budget accounting even when their nonce reservations clear.
 - Keys: the guard binds the wallet's address, not its keys, so the wallet's keys can be rotated
   without touching the contract. Changing the keys of the 2-of-2 wallet itself needs both keys, so
   the custodian must hold a recoverable backup of key 1. Losing key 1 stops every payment (fail
