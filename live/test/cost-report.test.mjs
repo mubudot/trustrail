@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AccountAddress, CcdAmount, Energy, ReceiveName, TransactionHash } from '@concordium/web-sdk';
+import { AccountAddress, CcdAmount, ContractAddress, Energy, Parameter, ReceiveName, TransactionHash } from '@concordium/web-sdk';
 import { collectTransactions, classifyTransaction, measuredTransaction, aggregateTransactions, median,
   ratio, deriveFlows, payerLabels, renderCostReport, ccdCost, decimal, REQUEST_ANCHOR, APPROVAL_ANCHOR, COST_NOTE } from '../src/cost-report.mjs';
 import { A } from './helpers.mjs';
@@ -9,7 +9,7 @@ const h = (n) => n.toString(16).padStart(64, '0');
 const ref = (n, authIds = []) => ({ hash: h(n), sources: ['fixture'], authIds });
 const summary = (over = {}) => ({ hash: TransactionHash.fromHexString(h(1)), sender: AccountAddress.fromBase58(A.agent),
   cost: 1_000_001n, energyCost: Energy.create(101n), transactionType: 'update',
-  events: [{ receiveName: ReceiveName.fromString('agent_spend_guard.authorize') }], ...over });
+  events: [{ tag: 'Updated', receiveName: ReceiveName.fromString('agent_spend_guard.authorize') }], ...over });
 const finalized = (s) => ({ status: 'finalized', outcome: { summary: s } });
 const measured = (n, kind, microCcd, authIds = ['0']) => ({ ...ref(n, authIds), kind, energy: BigInt(microCcd), microCcd: BigInt(microCcd),
   outcome: 'success', sender: A.agent, charges: [{ payer: A.agent, microCcd: BigInt(microCcd) }] });
@@ -36,16 +36,36 @@ test('invalid transaction fields fail instead of silently disappearing from the 
 });
 
 test('classifies guard entrypoints, setup, admin and rejected calls from finalized summaries', () => {
-  for (const entry of ['authorize', 'approve', 'commitPayment', 'recordSettlement', 'anchorAudit']) {
-    assert.equal(classifyTransaction(summary({ events: [{ receiveName: `agent_spend_guard.${entry}` }] })), entry);
+  for (const entry of ['authorize', 'approve', 'commitPayment', 'recordSettlement', 'anchorAudit', 'cancel', 'registerAgent']) {
+    assert.equal(classifyTransaction(summary({ events: [{ tag: 'Updated', receiveName: `agent_spend_guard.${entry}` }] })), entry);
   }
   assert.equal(classifyTransaction(summary({ transactionType: 'failed', failedTransactionType: 'update', events: [],
     rejectReason: { receiveName: ReceiveName.fromString('agent_spend_guard.authorize') } })), 'authorize');
   for (const [transactionType, kind] of [['deployModule', 'deploy'], ['initContract', 'init'], ['transfer', 'other']]) {
     assert.equal(classifyTransaction(summary({ transactionType, events: [] })), kind);
   }
-  assert.equal(classifyTransaction(summary({ events: [{ receiveName: 'agent_spend_guard.registerAgent' }] })), 'admin');
-  assert.equal(classifyTransaction(summary({ events: [{ receiveName: 'another_contract.approve' }] })), 'admin');
+  assert.equal(classifyTransaction(summary({ events: [{ tag: 'Updated', receiveName: 'CIS-8004.register' }] })), 'admin');
+  assert.equal(classifyTransaction(summary({ events: [{ tag: 'Updated', receiveName: 'another_contract.approve' }] })), 'admin');
+});
+
+test('nested SDK traces classify the outer guard receive instead of the inner registry call', () => {
+  // Shape and order checked against finalized testnet summary a30abd837a0d9395…;
+  // empty parameters/events keep the offline fixture focused on trace structure.
+  const guard = ContractAddress.create(13037n, 0n);
+  const registry = ContractAddress.create(12802n, 0n);
+  const update = (address, instigator, name) => ({ tag: 'Updated', contractVersion: 1, address, instigator,
+    amount: CcdAmount.fromMicroCcd(0n), message: Parameter.empty(), receiveName: ReceiveName.fromString(name), events: [] });
+  const s = summary({ events: [
+    { tag: 'Interrupted', address: guard, events: [] },
+    update(registry, { type: 'AddressContract', address: guard }, 'CIS-8004.balanceOf'),
+    { tag: 'Resumed', address: guard, success: true },
+    update(guard, { type: 'AddressAccount', address: AccountAddress.fromBase58(A.agent) }, 'agent_spend_guard.registerAgent'),
+  ] });
+  const tx = measuredTransaction(ref(1), finalized(s));
+  assert.equal(tx.kind, 'registerAgent');
+  assert.equal(tx.entrypoint, 'agent_spend_guard.registerAgent');
+  assert.equal(tx.energy, 101n);
+  assert.equal(tx.microCcd, 1_000_001n);
 });
 
 test('RegisterData anchors use the on-chain CBOR type, never a local filename or digest', () => {
@@ -159,4 +179,31 @@ test('Markdown states measured provenance and exact fees; EUR appears only with 
   assert.deepEqual(flows.small.currentMicroCcd, ratio(372_000n));
   assert.match(renderCostReport({ ...base, flows, rates }), /EUR estimate from testnet parameters/);
   assert.match(renderCostReport({ ...base, errors: [{ hash: h(99), error: 'not finalized' }] }), /Incomplete reads — no generated file written/);
+});
+
+test('Markdown leads with generated purchase costs, explains payers, and leaves transaction detail last', () => {
+  const { run, entries, transactions } = flowFixture();
+  const rates = { readAt: 'now', blockHash: h(99), blockTime: 'now', euroPerEnergy: ratio(1n, 50_000n), microCcdPerEuro: ratio(400_000_000n) };
+  const md = renderCostReport({ generatedAt: 'now', sources: ['fixture.json'], transactions,
+    totals: aggregateTransactions(transactions), labels: {}, flows: deriveFlows(transactions, run, entries, rates), rates });
+  assert.deepEqual(md.match(/^## .+$/gm), [
+    '## Per purchase', '## Formulas and who pays', '## Current testnet chain parameters',
+    '## Historical totals (including setup and refused transactions)', '## Per transaction',
+  ]);
+  const firstScreen = md.split('## Formulas and who pays')[0];
+  assert.match(firstScreen, /\| C_small \| 93\/2 \| 0\.000046500 \| 93\/2 \| 0\.372000000 \| 0\.00093000 \|/);
+  assert.match(firstScreen, /\| C_large \| 273\/2 \| 0\.000136500 \| 273\/2 \| 1\.092000000 \| 0\.00273000 \|/);
+  assert.match(firstScreen, /euro-per-energy is a chain parameter/);
+  assert.match(firstScreen, /current testnet parameter values.*same on mainnet only if mainnet uses the same euro-per-energy/);
+  for (const row of [
+    '| x402 settlement | facilitator (sponsor) |',
+    '| authorize, recordSettlement, anchorAudit | agent control |',
+    '| commitPayment, verification request anchor, audit record anchor, cancel | co-signer |',
+    '| approve | owner |',
+    '| Payer | Transactions | Test CCD | Exact microCCD |',
+  ]) assert.ok(md.includes(row));
+  assert.match(md, /2-of-2 agent wallet pays 0 because settlements are sponsored/);
+  const incomplete = renderCostReport({ generatedAt: 'now', sources: [], transactions: [],
+    totals: aggregateTransactions([]), labels: {}, flows: deriveFlows([], run, entries, rates), rates });
+  assert.match(incomplete, /\| C_small \| unavailable:.*\| — \| — \| — \| — \|/);
 });
