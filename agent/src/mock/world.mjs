@@ -11,6 +11,7 @@ import { newKeyPair } from '../payments/tx.mjs';
 import { MockFacilitator } from './facilitator.mjs';
 import { MockLedger } from './ledger.mjs';
 import { MockSeller } from './seller.mjs';
+import { WEATHER, DATASET } from './demo-data.mjs';
 
 export const NETWORK = 'ccd:4221332d34e1694168c2a0c0b3fd0f27'; // Concordium testnet (CAIP-2)
 export const CCD = 1_000_000n; // microCCD per CCD
@@ -48,8 +49,8 @@ export function createWorld({ startMs = Date.UTC(2026, 11, 1, 9, 0, 0), policy }
   const dataSeller = new MockSeller({
     payTo: ACCOUNTS.dataSeller, facilitator, network: NETWORK, badge: 'BadgeDataSeller',
     routes: {
-      '/weather': { amount: CCD / 2n, asset: 'CCD', description: 'Hourly weather feed', body: { tokyo: '18C, clear' } },
-      '/dataset': { amount: 4n * CCD, asset: 'CCD', description: 'Labelled dataset (1k rows)', body: { rows: 1000 } },
+      '/weather': { amount: CCD / 2n, asset: 'CCD', description: 'Hourly weather feed', body: WEATHER },
+      '/dataset': { amount: 4n * CCD, asset: 'CCD', description: 'Labelled dataset (1k rows)', body: DATASET },
     },
   });
   const shadySeller = new MockSeller({

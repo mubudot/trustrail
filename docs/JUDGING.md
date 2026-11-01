@@ -24,6 +24,12 @@ It ends with `Spent today: 12 CCD of 12 CCD` and `Audit log: … entries, chain 
 chain runs the same policy rules as the contract; the real contract is tested separately in Rust
 (`contract/`, see the README).
 
+Try the [MCP purchasing integration](AGENT_INTEGRATION.md) with
+`(cd live && npm ci && npm run mcp:transcript)`: an actual scripted stdio client receives useful
+synthetic forecast data and a fixture receipt, then reaches pending on a dataset purchase.
+Only purchasing/status/resume tools are exposed; the agent cannot approve. This is offline
+integration evidence; the MCP testnet mode has not been exercised.
+
 ## 2. The live testnet deployment, read-only (one command)
 
 ```bash

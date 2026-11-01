@@ -8,6 +8,7 @@ approved *that exact payment* — with the proof anchored on chain for audit.**
 on-chain policy; anything above 2 CCD needs the identity-verified owner to approve *that* purchase.
 
 **Judge start:** [verify it in a few minutes, no keys](docs/JUDGING.md) ·
+[connect an agent over MCP, offline](docs/AGENT_INTEGRATION.md) ·
 [deployment and selected demo transactions](docs/TESTNET.md) · [path to production](docs/PRODUCTION.md) ·
 [measured fees per purchase](docs/COSTS.md) · [demo video (2:58)](https://youtu.be/lQQWTXewqcg).
 
@@ -15,7 +16,8 @@ on-chain policy; anything above 2 CCD needs the identity-verified owner to appro
 co-signer running in the buyer's process. Production approval must come from an owner-controlled
 Concordium wallet supporting an account-credential proof for the guard owner's account; wallet
 transport and request compatibility remain to be demonstrated. Separate co-signer custody is
-production work ([plan](docs/PRODUCTION.md)).
+production work ([plan](docs/PRODUCTION.md)). The [MCP purchasing tools](docs/AGENT_INTEGRATION.md)
+are implemented and tested in the offline reference world; their testnet mode has not been exercised.
 
 Live on Concordium **testnet**: guard contract [<13037,0>](https://ccdexplorer.io/testnet/instance/13037/0),
 Verified-by-Concordium badges for both agents, real x402 settlements, ZK approval records and an

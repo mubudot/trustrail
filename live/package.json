@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@concordium/web-sdk": "^12.0.2",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@x402/concordium": "^2.29.0",
     "@x402/core": "^2.29.0",
     "@x402/express": "^2.29.0",
@@ -21,6 +22,8 @@
     "costs": "node tools/cost-report.mjs",
     "demo": "node demo/testnet.mjs",
     "audit:doc": "node tools/write-audit-doc.mjs",
-    "check-badge": "node tools/check-badge.mjs"
+    "check-badge": "node tools/check-badge.mjs",
+    "mcp": "node src/mcp/server.mjs",
+    "mcp:transcript": "node tools/mcp-transcript.mjs"
   }
 }

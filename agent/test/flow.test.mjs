@@ -8,7 +8,10 @@ test('small purchase from a verified, allowlisted seller is paid and recorded on
   const before = w.ledger.account(ACCOUNTS.dataSeller)?.balance ?? 0n;
   const r = await w.agent.buy('https://data.example/weather', { intent: 'weather for Tokyo' });
   assert.equal(r.status, 'paid');
-  assert.deepEqual(r.data, { tokyo: '18C, clear' });
+  assert.equal(r.data.demo, true);
+  assert.equal(r.data.location, 'Tokyo');
+  assert.equal(r.data.hourly.length, 3);
+  assert.equal(r.data.hourly[0].temperature, 18);
   assert.equal(w.ledger.account(ACCOUNTS.dataSeller).balance - before, CCD / 2n);
   const a = w.guard.authorization(r.authId).auth;
   assert.equal(a.status, 'Settled');

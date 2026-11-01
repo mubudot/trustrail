@@ -11,14 +11,15 @@ import { LiveAgent } from './live-agent.mjs';
 import { createFacilitator, createSellerApp, listen } from './x402-seller.mjs';
 import { AuditLog } from '../../agent/src/audit/log.mjs';
 import { HostedBadgeResolver } from '../../agent/src/identity/badge.mjs';
+import { WEATHER, DATASET } from '../../agent/src/mock/demo-data.mjs';
 
 export const STATE_DIR = path.dirname(STATE_FILE);
 export const APPROVALS_DIR = path.join(STATE_DIR, 'approvals');
 export const AUDIT_FILE = path.join(STATE_DIR, 'audit.jsonl');
 
 export const ITEMS = {
-  '/weather': { microCcd: 500_000n, description: 'Hourly weather feed (0.5 CCD)', body: { tokyo: '18C, clear' } },
-  '/dataset': { microCcd: 4_000_000n, description: 'Labelled dataset, 1k rows (4 CCD)', body: { rows: 1000 } },
+  '/weather': { microCcd: 500_000n, description: 'Hourly weather feed (0.5 CCD)', body: WEATHER },
+  '/dataset': { microCcd: 4_000_000n, description: 'Labelled dataset, 1k rows (4 CCD)', body: DATASET },
   '/bulk': { microCcd: 9_000_000n, description: 'Bulk export (9 CCD)', body: { rows: 100000 } },
 };
 
