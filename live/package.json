@@ -18,6 +18,7 @@
     "test": "node --test \"test/**/*.test.mjs\"",
     "attacks": "node attacks/run.mjs",
     "verify": "node tools/verify-testnet.mjs",
+    "costs": "node tools/cost-report.mjs",
     "demo": "node demo/testnet.mjs",
     "audit:doc": "node tools/write-audit-doc.mjs",
     "check-badge": "node tools/check-badge.mjs"
