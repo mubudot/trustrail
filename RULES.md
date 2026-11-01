@@ -114,5 +114,4 @@ Read from the logged-in Encode dashboard on 2026-10-31 (no changes made there):
 
 The testnet build no longer needs anything from the user: the throwaway testnet identity (Concordium
 testnet IdP, dummy attributes) and accounts were created by script; keys live in `live/.secrets/`
-(gitignored). User steps left: (1) create the project + connect Discord before 22 Nov 23:59 UTC;
-(2) approve making the repo public, the video upload and the final submission.
+(gitignored). What is still open is tracked in [docs/USER_STEPS.md](docs/USER_STEPS.md).
