@@ -30,5 +30,7 @@ callout that restates the key fact so it reads on a phone.
 | 11 | 2:28–2:42 | Terminal: real `npm run verify` output, 23 PASS, "all checks passed"; audit log head anchored after the run and matching all 6 on-chain authorisations (`38d93421…`) | Anyone can check this without keys. One command re-checks the badges, the wallet, both settlements against the committed digest, the proof, every refusal, and the anchored audit log. Twenty-three checks pass. |
 | 12 | 2:42–2:58 | Honest limits + close: owner key = policy admin (co-signer pins its own threshold); demo co-signer shares the agent's Node process (production: separate service); 158 tests (contract 34 · agent 33 · live adapters 91); "No verified human, no payment." | What we do not claim: the owner key can change the policy; the co-signer pins its own threshold. In this demo the co-signer shares the agent's process; production needs it as a separate service. TrustRail. No verified human, no payment. |
 
+The video was recorded when the suites had 158 tests; current counts: [README](../README.md).
+
 Build: `work/ccdvid/build.py` in the hackathon workspace (outside this repo) renders the scenes from
 the explorer captures, `check-badge`, `attacks` and `verify` output, narrates them with Piper, and writes `concordium_demo.mp4`.
