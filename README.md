@@ -145,15 +145,16 @@ One command for the offline contract + co-signer [attack demonstrations](docs/AT
 
 ```bash
 # offline (no keys, no network)
-cd agent && npm test && npm run demo:mock
-cd contract && cargo test            # after ./scripts/build-wasm.sh (Rust 1.99.1 + wasm32v1-none)
-cd live && npm ci && npm test
-cd live && npm run attacks          # Node attacks only; add -- --json for JSON output
+(cd agent && npm test && npm run demo:mock)
+(cd contract && cargo test --locked)  # after ./scripts/build-wasm.sh (Rust 1.99.1 + wasm32v1-none)
+(cd live && npm ci && npm test)
+(cd live && npm run attacks)          # Node attacks only; add -- --json inside the subshell
 
 # read-only checks of the live testnet deployment (no keys)
-cd live && npm run verify       # 23 checks: badges, guard, ZK approval, settlements, audit anchor
-npm run check-badge             # both badges through the hosted Agent Registry MCP (check_badge)
-npm run audit:doc               # regenerate docs/AUDIT_LOG.md from live/state/audit.jsonl + chain
+(cd live && npm run verify)       # 23 checks: badges, guard, ZK approval, settlements, audit anchor
+(cd live && npm run check-badge)  # both badges through the hosted Agent Registry MCP (check_badge)
+(cd live && npm run audit:doc)    # read the chain; write local docs/AUDIT_LOG.md from the audit log
+(cd live && npm run costs)        # read finalized testnet fees; -- --write generates local docs/COSTS.md
 ```
 
 Reproducing the deployment from scratch (own throwaway testnet identity, accounts, faucet,

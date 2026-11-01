@@ -66,8 +66,9 @@ x402 payment. So:
 3. **Escrow mode** for agent-to-agent CCD payments that do not need x402: the contract holds the
    budget and transfers directly — fully on-chain enforcement, no co-signer.
 
-Testnet demo can start with a single-key agent account (co-signer simulated) and upgrade to the
-2-of-2 account once the account key update is scripted; mock mode exercises the 2-of-2 logic.
+The live testnet demo uses a native 2-of-2 wallet: the agent signs key 0, and the co-signer checks
+and commits the transfer before signing key 1. Both keys currently run in the buyer process;
+separate co-signer custody remains production work. Mock mode exercises the same signing policy.
 
 ## Verified-human approval (live since 2026-10-31)
 
@@ -123,7 +124,8 @@ Presentation V1) proof** instead of a bare owner signature:
 - `audit.mjs` — hash-chained JSONL audit log.
 - `mock/` — in-memory chain (same policy), x402 seller + facilitator, so judges can run everything
   with no key and no network: `npm test`, `npm run demo:mock`.
-- Live mode (later, testnet): `@concordium/web-sdk` + `@x402/concordium`, hosted Agent Registry MCP.
+- Live mode (`live/`, implemented on testnet): `@concordium/web-sdk` + `@x402/concordium`, hosted
+  Agent Registry MCP, native 2-of-2 payments and payment-specific verified-human approvals.
 
 ## Reused ideas
 

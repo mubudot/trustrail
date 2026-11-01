@@ -112,7 +112,12 @@ node demo/testnet.mjs impostor         # look-alike payee: refused before any tr
 node demo/testnet.mjs anchor           # anchorAudit(head, count) of the hash-chained log
 ```
 
-## 9. Check it and publish the record (read-only, no keys)
+## 9. Check the chain and generate local records (no keys)
+
+The checks use read-only network calls. The document generators write local Markdown only:
+`write-testnet-doc.mjs` reads the public state files without network access; `audit:doc` reads
+the chain for block times and the anchor check. Neither generator sends transactions or publishes
+anything. `npm run audit:doc -- --offline` skips chain reads and labels the output unverified.
 
 ```bash
 npm run verify                    # 23 checks against testnet: badges, guard, ZK approval, settlements, anchor

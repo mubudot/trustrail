@@ -1,5 +1,6 @@
 // Regenerates ../docs/AUDIT_LOG.md: the agent's hash-chained audit log as an Art. 12-style record
-// with CCDExplorer links, block times and an on-chain anchor check. Read-only, needs NO keys.
+// with CCDExplorer links, block times and an on-chain anchor check. Reads the chain; writes local
+// Markdown only. Needs NO keys, sends no transactions and publishes nothing.
 //   node tools/write-audit-doc.mjs            # reads testnet (block times + anchor check)
 //   node tools/write-audit-doc.mjs --offline  # no network: links only
 import fs from 'node:fs';

@@ -154,6 +154,7 @@ test('a payment resumed after other requests stays with its own task', () => {
 
 test('offline rendering says block times were not read, instead of "nothing on chain"', () => {
   const md = renderAuditReport({ entries: sampleLog(), chain: { ok: true }, state, run: { steps: [] } });
+  assert.match(md, /generator reads the chain and writes local Markdown only; it sends no transactions and publishes nothing/);
   assert.match(md, /block times not read: offline/);
   assert.match(md, /\(no transaction\)/);
   assert.doesNotMatch(md, /agent clock; nothing on chain/);
