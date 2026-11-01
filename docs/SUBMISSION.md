@@ -9,7 +9,7 @@ Due Wed 9 Dec 23:59 UTC. Every link below must open without signing in (the repo
 - Code: https://github.com/mubudot/trustrail
 - Demo video (2:58): https://youtu.be/lQQWTXewqcg
 - CCDExplorer: guard contract https://ccdexplorer.io/testnet/instance/13037/0
-  (deployment and selected demo transactions: [TESTNET.md](https://github.com/mubudot/trustrail/blob/main/docs/TESTNET.md); full list of recorded transactions: [COSTS.md](COSTS.md), with purchase lifecycles in [AUDIT_LOG.md](AUDIT_LOG.md))
+  (deployment and selected demo transactions: [TESTNET.md](https://github.com/mubudot/trustrail/blob/main/docs/TESTNET.md); full list of recorded transactions: [COSTS.md](https://github.com/mubudot/trustrail/blob/main/docs/COSTS.md), with purchase lifecycles in [AUDIT_LOG.md](https://github.com/mubudot/trustrail/blob/main/docs/AUDIT_LOG.md))
 - Path to production: [PRODUCTION.md](https://github.com/mubudot/trustrail/blob/main/docs/PRODUCTION.md) · Judge route: [JUDGING.md](https://github.com/mubudot/trustrail/blob/main/docs/JUDGING.md)
 
 ## Description

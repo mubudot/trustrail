@@ -7,8 +7,8 @@ x402 payments and audit anchors were all created by the scripts in [RUNBOOK.md](
 Nothing below involves mainnet or money.
 
 You can review the protections locally with `bash scripts/attacks.sh` from the repository root
-([attack map and setup](ATTACKS.md)). Current suites: **177 passing tests** — contract 34
-(9 unit + 25 integration), agent 33, live 110. The Node attack demonstration reports
+([attack map and setup](ATTACKS.md)). Current suites: **202 passing tests** — contract 34
+(9 unit + 25 integration), agent 33, live 135. The Node attack demonstration reports
 **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**.
 
 Done: the project is created on the Encode dashboard (Checkpoint 1, due Sun 22 Nov 23:59 UTC), the
