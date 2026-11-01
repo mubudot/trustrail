@@ -45,7 +45,7 @@ export class LiveCosigner {
   }
 
   /** Per-call receipts let a service handle concurrent requests without shared receipt state. */
-  async cosignWithReceipt({ authId, signableJSON, resourceUrl, requirements }) {
+  async cosignWithReceipt({ authId, signableJSON, resourceUrl, requirements }, { beforeCommit = async () => {} } = {}) {
     const no = (r) => { throw new CosignRefused(r); };
     const view = await this.guard.authorization(authId);
     if (!view) no('unknown_authorization');
@@ -117,6 +117,7 @@ export class LiveCosigner {
       if (issue) no(issue);
     }
 
+    await beforeCommit({ authId, wallet: rec.wallet, nonce: BigInt(h.nonce.value ?? h.nonce), digest });
     let commitTx;
     try {
       const c = await this.guard.send('commitPayment', { id: BigInt(authId), digest }, { sender: this.account.address, signer: this.account.signer });

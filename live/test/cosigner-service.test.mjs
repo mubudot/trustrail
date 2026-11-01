@@ -73,7 +73,7 @@ test('service_configuration_is_independent_and_pins_guard_network_owner_agent_th
   const file = path.join(dir, 'service.json');
   const c = { network: f.input.requirements.network, guard: { index: '13037', subindex: '0' }, owner: A.owner, agent: A.agent,
     humanProofAbove: '2000000', agentPublicKey: f.keys.agent.publicKey, walletKey: f.keys.cosigner.privateKey,
-    account: { address: A.cosigner, keys: { 0: f.keys.cosigner } }, approvalsDir: './approvals' };
+    account: { address: A.cosigner, keys: { 0: f.keys.cosigner } }, approvalsDir: './approvals', nonceStateFile: './wallet-nonces.json' };
   writeFileSync(file, JSON.stringify(c), { mode: 0o600 });
   const config = loadCosignerConfig(file);
   assert.equal(config.walletKey, f.keys.cosigner.privateKey);
@@ -83,6 +83,7 @@ test('service_configuration_is_independent_and_pins_guard_network_owner_agent_th
   assert.equal(config.network, f.input.requirements.network);
   assert.deepEqual(config.guard.address, { index: 13037n, subindex: 0n });
   assert.equal(typeof config.resolver.resolve, 'function');
+  assert.equal(config.nonceStateFile, path.join(dir, 'wallet-nonces.json'));
   assert.equal(await config.approvals(5n), null);
   assert.equal('agentKey' in config, false);
   writeFileSync(file, JSON.stringify({ ...c, network: 'ccd:other' }));

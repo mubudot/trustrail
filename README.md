@@ -98,7 +98,8 @@ controls and optional read-only testnet checks.
   subverted (e.g. it skips its own preflight and calls the guard directly — row 6), not one whose
   host is fully compromised. Someone with code execution in that process could read key 1 and sign
   alone. An authenticated HTTP co-signer service and client are implemented and tested offline,
-  including separate buyer configuration with wallet key 0 only and a race between service replicas
+  including separate buyer configuration with wallet key 0 only, wallet nonce reservations within
+  one service, and a same-authorization race between service replicas
   ([setup](docs/PRODUCTION.md#separate-co-signer-service-offline-tested)). The recorded testnet runs
   used the in-process co-signer; separate custody has not been demonstrated on testnet yet.
 - **The co-signer is trusted to follow the rules.** Its key is half of the 2-of-2 wallet; if it is

@@ -53,7 +53,7 @@ separate custody.
 | File | Required shape / contents |
 | --- | --- |
 | Buyer config | Exactly `agent` and `wallet`, each with `address` and `keys: {"0": {"privateKey": …, "publicKey": …}}`; optional `threshold`. These are the agent control key and payment wallet key 0. Additional roles or wallet key 1 are rejected. |
-| Service config | `network` (testnet x402 network id), `guard: {index, subindex}`, `owner`, `agent`, `humanProofAbove` (decimal microCCD), `agentPublicKey` (wallet key 0 public key), `walletKey` (wallet key 1 private key), `account` (co-signer control address and `keys[0]` pair), `approvalsDir` (public verifier records, relative to the config file). |
+| Service config | `network` (testnet x402 network id), `guard: {index, subindex}`, `owner`, `agent`, `humanProofAbove` (decimal microCCD), `agentPublicKey` (wallet key 0 public key), `walletKey` (wallet key 1 private key), `account` (co-signer control address and `keys[0]` pair), `approvalsDir` (public verifier records), `nonceStateFile` (durable public nonce journal). Both paths are relative to the config file. |
 
 The service pins its **own** guard, network, owner, agent, threshold and badge resolver on startup.
 Its badge resolver is the hosted registry adapter. The request cannot change any of these, supply
@@ -81,12 +81,31 @@ and a stable `reason`; missing authentication returns HTTP 401. Signing refusals
 implicitly cancel: the buyer calls `release()` and receives that cancellation's receipt.
 A lost signing response is an unknown outcome, preserved for reconciliation without cancellation
 or payment retry. Per-call receipts avoid sharing mutable receipt state across HTTP requests;
-the guard's atomic `commitPayment` still ensures only one replica releases a signature.
+the guard's atomic `commitPayment` ensures only one signature for the **same authorization**
+across replicas. It does not coordinate wallet nonces across different authorizations.
+
+Within one signing instance, signing and release are serialized per wallet. Before committing,
+the service reserves the wallet nonce for its authorization and digest; another authorization at
+that nonce receives `wallet_nonce_in_use` before `commitPayment`. Reservations remain outstanding
+through lost responses and expiry. They clear only when the guard reports Settled/Cancelled or
+the node's next wallet nonce has advanced past the reserved nonce. `nonceStateFile` is written
+atomically before commit and restored on restart; it stores only public wallet addresses, nonces,
+authorization ids and digests, scoped to the configured network, guard and agent. Keep this file
+across restarts, reconcile existing commitments when provisioning a journal, and never delete it
+to bypass a refusal. A journal write failure prevents committing.
+
+**Before mainnet, run a single signing instance for each wallet, or add a shared lock and durable
+reservation store spanning every replica.** The journal is for one writer and does not supply a
+cross-process lock. Two replicas with separate memory or even the same journal file can still
+commit different authorizations at one nonce; multi-replica wallet safety is not implemented or
+claimed. Low-level in-process co-signers also lack this service coordinator.
 
 Offline tests use generated keys, the actual approval verifier with captured public chain
 responses, mock guard transitions, HTTP on loopback, and fake settlement responses. They cover
 small and proof-required buyer payments, forged proofs, pinned settings, authentication,
-key separation, cancellation receipts, lost responses and a replica race. They do not establish
+key separation, cancellation receipts, malformed/lost responses, a same-authorization replica race,
+different-authorization nonce conflicts within one service, settlement reconciliation and journal
+recovery after restart. They do not establish
 separate host custody, a live owner wallet integration or a new testnet settlement.
 
 ## Recovery and operations

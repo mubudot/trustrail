@@ -3,6 +3,7 @@
 import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { LiveCosigner, CosignRefused } from './cosigner-live.mjs';
+import { WalletNonces } from './cosigner-nonces.mjs';
 
 const idOK = (id) => typeof id === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(id) && BigInt(id) <= 18446744073709551615n;
 const object = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -29,6 +30,8 @@ export function createCosignerService({ config, token }) {
   const expected = Buffer.from(`Bearer ${token}`);
   const network = config.network;
   const cosigner = new LiveCosigner({ ...config, requireVerifiedPayee: true });
+  const nonces = new WalletNonces({ guard: cosigner.guard, file: config.nonceStateFile,
+    scope: JSON.stringify([network, String(cosigner.guard.address.index), String(cosigner.guard.address.subindex), cosigner.agentAccount]) });
 
   const server = createServer(async (req, res) => {
     let authId = null;
@@ -50,11 +53,17 @@ export function createCosignerService({ config, token }) {
       const input = await readJSON(req);
       if (idOK(input?.authId)) authId = input.authId;
       if (authId === null) fail('invalid_auth_id');
+      const wallet = (await cosigner.guard.agent(cosigner.agentAccount))?.record.wallet;
+      if (!wallet) fail('unknown_agent');
       if (req.url === '/release') {
         if (!keysOnly(input, ['authId'])) fail('invalid_arguments');
-        const view = await cosigner.guard.authorization(BigInt(authId));
-        if (!view || view.auth.agent !== cosigner.agentAccount) fail('authorization_for_other_agent');
-        const out = await cosigner.releaseWithReceipt(BigInt(authId));
+        const out = await nonces.run(wallet, async () => {
+          const view = await cosigner.guard.authorization(BigInt(authId));
+          if (!view || view.auth.agent !== cosigner.agentAccount) fail('authorization_for_other_agent');
+          const released = await cosigner.releaseWithReceipt(BigInt(authId));
+          await nonces.reconcile(wallet);
+          return released;
+        });
         reply(200, { status: 'released', released: out.released, receipt: { cancelTx: out.cancelTx } });
         return;
       }
@@ -62,7 +71,8 @@ export function createCosignerService({ config, token }) {
         || !object(input.signableJSON) || !object(input.requirements)
         || typeof input.resourceUrl !== 'string' || input.resourceUrl.length > 2048) fail('invalid_arguments');
       if (input.requirements.network !== network) fail('network_mismatch');
-      const out = await cosigner.cosignWithReceipt({ ...input, authId: BigInt(authId) });
+      const out = await nonces.run(wallet, () => cosigner.cosignWithReceipt({ ...input, authId: BigInt(authId) },
+        { beforeCommit: (reservation) => nonces.reserve(reservation) }));
       reply(200, { status: 'signed', signature: out.signature, receipt: { commitTx: out.commitTx, digest: out.digest } });
     } catch (e) {
       if (e instanceof CosignRefused) reply(422, { status: 'refused', reason: e.reason });
