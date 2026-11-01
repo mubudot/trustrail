@@ -5,7 +5,7 @@
   "description": "AI-agent client for the agent_spend_guard contract: policy preflight, x402 payments on Concordium, deterministic co-signer, badge checks, hash-chained audit log. Mock mode needs no key and no network.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "scripts": {
     "test": "node --test \"test/**/*.test.mjs\"",
     "demo:mock": "node demo/mock-demo.mjs"

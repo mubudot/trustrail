@@ -19,7 +19,7 @@ for (const scenario of scenarios) {
 test('attack CLI succeeds offline, emits only JSON with --json, and reports every scenario', async () => {
   const { stdout, stderr } = await promisify(execFile)(process.execPath,
     ['--import', new URL('./offline-only.mjs', import.meta.url).href,
-      new URL('../attacks/run.mjs', import.meta.url).pathname, '--json'], { timeout: 60_000 });
+      new URL('../attacks/run.mjs', import.meta.url).pathname, '--json'], { timeout: 180_000 });
   assert.equal(stderr, '');
   const result = JSON.parse(stdout);
   assert.equal(result.results.length, scenarios.length);

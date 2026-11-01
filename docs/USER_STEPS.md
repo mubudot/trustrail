@@ -11,21 +11,17 @@ You can review the protections locally with `bash scripts/attacks.sh` from the r
 (9 unit + 25 integration), agent 33, live 110. The Node attack demonstration reports
 **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**.
 
+Done: the project is created on the Encode dashboard (Checkpoint 1, due Sun 22 Nov 23:59 UTC), the
+repository is public, and the demo video is uploaded: https://youtu.be/lQQWTXewqcg (linked from the
+README "Judge start" line and [SUBMISSION.md](SUBMISSION.md)).
+
 What is left needs your account or your decision:
 
-1. **Checkpoint 1, by Sun 22 Nov 23:59 UTC.** On the Encode dashboard
-   (Concordium Trusted Agents Hackathon → Create Project) paste the name and description from
-   [CHECKPOINT1.md](CHECKPOINT1.md). The programme opens on 2 Nov; you can also just tell the
-   assistant to do it with your saved Encode login.
-2. **Say when the repository may go public.** The final submission needs a public repo. The
-   history has been scanned for secrets and personal data; `live/.secrets/` is gitignored.
-3. **Approve the demo video upload** (YouTube, unlisted is enough) when you have reviewed it. Its
-   public URL then goes into the README "Judge start" line and [SUBMISSION.md](SUBMISSION.md).
-4. **Keep the Agent Card host up until judging ends, or approve moving the cards.** The two badges
+1. **Keep the Agent Card host up until judging ends, or approve moving the cards.** The two badges
    are only `VALID` while their cards are served at the pinned URL (today a temporary host on the
    project VPS). Once the repo is public the cards can move to GitHub Pages; that needs one free
-   testnet `setAgentURI` per badge (`publish-agent-cards.mjs --pin`), which the assistant can run.
-5. **Final submission, by Wed 9 Dec 23:59 UTC.** Submit on the Encode dashboard with the repo
+   testnet `setAgentURI` per badge (`publish-agent-cards.mjs --pin`).
+2. **Final submission, by Wed 9 Dec 23:59 UTC.** Submit on the Encode dashboard with the repo
    link, the video link and a CCDExplorer link (guard `<13037,0>`:
    https://ccdexplorer.io/testnet/instance/13037/0).
 

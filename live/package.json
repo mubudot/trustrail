@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Concordium testnet adapters for TrustRail (web-sdk, x402, Agent Registry)",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@concordium/web-sdk": "^12.0.2",

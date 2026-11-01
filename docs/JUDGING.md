@@ -1,6 +1,6 @@
 # Judging TrustRail in a few minutes
 
-Everything here runs from the repository root with Node 20+ and needs **no keys, no wallet and no
+Everything here runs from the repository root with Node 22+ and needs **no keys, no wallet and no
 test CCD**. Install time (`npm ci`) is not counted in the timings below; the testnet check also
 depends on the public testnet node, which sometimes answers slowly (the tool retries).
 

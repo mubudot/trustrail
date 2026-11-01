@@ -32,5 +32,4 @@ callout that restates the key fact so it reads on a phone.
 
 The video was recorded when the suites had 158 tests; current counts: [README](../README.md).
 
-Build: `work/ccdvid/build.py` in the hackathon workspace (outside this repo) renders the scenes from
-the explorer captures, `check-badge`, `attacks` and `verify` output, narrates them with Piper, and writes `concordium_demo.mp4`.
+Build: a small render script (not part of this repository) assembles the scenes from the explorer captures, `check-badge`, `attacks` and `verify` output, narrates them with Piper, and writes `concordium_demo.mp4`.
