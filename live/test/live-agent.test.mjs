@@ -97,7 +97,7 @@ test('LiveAgent.buy signs key 0 before co-signing, carries the bound payment to 
   const f = setup();
   const result = await f.agent.buy(URL_, { intent: 'weather fixture' });
   assert.deepEqual(result, { status: 'paid', authId: 0n, txHash: TX.settlement, recordTx: TX.recordSettlement,
-    commitTx: TX.commitPayment, data: { weather: 'fixture' } });
+    digest: unOpt(f.guard._auth.commitment), commitTx: TX.commitPayment, data: { weather: 'fixture' } });
   assert.equal(f.sellerPayments.length, 1);
   const json = f.sellerPayments[0].payload.signedTransaction;
   assert.equal(json.header.sender, A.wallet);
@@ -162,7 +162,7 @@ test('LiveAgent.buy returns paid_unrecorded with settlement evidence when record
   const f = setup({ recordFails: true });
   const result = await f.agent.buy(URL_);
   assert.deepEqual(result, { status: 'paid_unrecorded', authId: 0n, txHash: TX.settlement,
-    commitTx: TX.commitPayment, data: { weather: 'fixture' } });
+    digest: unOpt(f.guard._auth.commitment), commitTx: TX.commitPayment, data: { weather: 'fixture' } });
   assert.deepEqual(f.audit.entries.map((e) => e.event), ['request', 'quote', 'authorized', 'cosigned', 'paid', 'settlement_record_failed']);
   assert.equal(f.audit.entries.at(-2).data.txHash, TX.settlement);
   assert.deepEqual(f.audit.entries.at(-1).data, { authId: '0', txHash: TX.settlement, error: 'record_unavailable' });

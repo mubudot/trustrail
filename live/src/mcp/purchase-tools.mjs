@@ -21,7 +21,6 @@ export const PURCHASE_TOOLS = [
 
 const jsonSafe = (v) => JSON.parse(JSON.stringify(v, (_key, x) => typeof x === 'bigint' ? String(x) : x));
 const tag = (v) => typeof v === 'string' ? v : Object.keys(v ?? {})[0];
-const option = (v) => v && typeof v === 'object' ? v.Some?.[0] ?? null : v;
 const refused = (reason, authId) => ({ status: 'refused', reason, ...(authId === undefined ? {} : { authId: String(authId) }) });
 
 function validArgs(name, args) {
@@ -39,6 +38,7 @@ export class PurchaseTools {
   constructor({ agent, guard, fixture = false }) {
     Object.assign(this, { agent, guard, fixture });
     this.purchases = new Map();
+    this.requests = new Map();
     this.lock = Promise.resolve();
   }
 
@@ -53,15 +53,22 @@ export class PurchaseTools {
     if (!PURCHASE_TOOLS.some(t => t.name === name)) return refused('unknown_tool');
     if (!validArgs(name, args)) return refused('invalid_arguments');
     if (name === 'buy_resource') {
+      const key = JSON.stringify([args.url, args.intent]);
+      const previous = this.requests.get(key);
+      // Identical calls in this session cannot repeat a confirmed or uncertain payment,
+      // including purchases which first waited for approval and were later resumed.
+      if (previous?.result.status === 'paid' || previous?.result.reason === 'settlement_unknown_do_not_retry') return previous.result;
       const result = await this.agent.buy(args.url, { intent: args.intent });
-      const normalized = await this.#normalize(result);
+      const normalized = this.#normalize(result);
       if (result.authId !== undefined) {
         const pending = this.agent.pending.get(String(result.authId));
-        this.purchases.set(String(result.authId), {
+        const purchase = {
           result: normalized,
           // A private snapshot, independent of the buyer's mutable pending map.
           quote: pending ? structuredClone(pending) : null,
-        });
+        };
+        this.purchases.set(String(result.authId), purchase);
+        this.requests.set(key, purchase);
       }
       return normalized;
     }
@@ -87,17 +94,18 @@ export class PurchaseTools {
       return purchase.result;
     }
     // Never fetch a new quote or accept caller-supplied payment/approval fields here.
-    purchase.result = await this.#normalize(await this.agent.resume(BigInt(args.authId)));
+    purchase.result = this.#normalize(await this.agent.resume(BigInt(args.authId)));
     purchase.quote = null;
     return purchase.result;
   }
 
-  async #normalize(out) {
+  #normalize(out) {
     const authId = out.authId === undefined ? undefined : String(out.authId);
     if (['paid', 'paid_unrecorded'].includes(out.status)) {
-      const a = (await this.guard.authorization(out.authId))?.auth;
+      // The buyer already has the committed digest. No enrichment RPC may stand between
+      // a confirmed payment and saving its receipt/content in the session cache.
       return { status: 'paid', reason: out.status === 'paid' ? 'payment_settled' : 'settlement_record_pending', authId,
-        receipt: { transactionHash: out.txHash, digest: option(a?.commitment), fixture: this.fixture,
+        receipt: { transactionHash: out.txHash, digest: out.digest, fixture: this.fixture,
           ...(out.commitTx ? { commitTransactionHash: out.commitTx } : {}),
           ...(out.recordTx ? { recordTransactionHash: out.recordTx } : {}) }, data: out.data };
     }

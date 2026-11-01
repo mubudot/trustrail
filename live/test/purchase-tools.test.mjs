@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld, ACCOUNTS } from '../../agent/src/mock/world.mjs';
 import { purposeHash } from '../../agent/src/util/canonical.mjs';
+import { GuardError } from '../../agent/src/policy/errors.mjs';
 import { PurchaseTools, PURCHASE_TOOLS } from '../src/mcp/purchase-tools.mjs';
 
 const weather = { url: 'https://data.example/weather', intent: 'forecast' };
@@ -110,12 +111,52 @@ test('mcp_retains_uncertain_settlement_and_paid_unrecorded_outcomes_without_retr
   for (const status of ['settlement_unknown', 'paid_unrecorded']) {
     let calls = 0;
     const tools = new PurchaseTools({ agent: { pending: new Map(), buy: async () => {
-      calls++; return { status, authId: 3n, txHash: '51'.repeat(32), data: { demo: true } };
+      calls++; return { status, authId: 3n, txHash: '51'.repeat(32), digest: 'cd'.repeat(32), data: { demo: true } };
     } }, guard: { authorization: async () => ({ auth: { commitment: { Some: ['cd'.repeat(32)] } } }) } });
     const out = await tools.call('buy_resource', weather);
     assert.equal(out.status, status === 'paid_unrecorded' ? 'paid' : 'pending');
     assert.equal(out.reason, status === 'paid_unrecorded' ? 'settlement_record_pending' : 'settlement_unknown_do_not_retry');
     assert.deepEqual(await tools.call('resume_purchase', { authId: '3' }), out);
+    assert.deepEqual(await tools.call('buy_resource', weather), out);
     assert.equal(calls, 1);
   }
 });
+
+for (const method of ['buy', 'resume']) {
+  for (const recordFails of [false, true]) {
+    test(`mcp_preserves_${method}_payment_when_post_payment_reads_fail_record_failed_${recordFails}`, async () => {
+      const { w, tools } = setup();
+      const args = method === 'buy' ? weather : dataset;
+      let pending;
+      if (method === 'resume') {
+        pending = await tools.call('buy_resource', args);
+        w.humanApprove(pending.authId);
+      }
+      if (recordFails) w.guard.recordSettlement = () => { throw new GuardError('Unavailable'); };
+      const original = w.agent[method].bind(w.agent);
+      let evidence, reads = 0, calls = 0;
+      w.agent[method] = async (...input) => {
+        calls++;
+        evidence = await original(...input);
+        assert.equal(evidence.status, recordFails ? 'paid_unrecorded' : 'paid');
+        assert.equal(evidence.digest, w.guard.authorization(evidence.authId).auth.commitment);
+        w.guard.authorization = () => { reads++; throw new Error('receipt_rpc_unavailable'); };
+        return evidence;
+      };
+      const out = await tools.call(method === 'buy' ? 'buy_resource' : 'resume_purchase',
+        method === 'buy' ? args : { authId: pending.authId });
+      assert.equal(out.status, 'paid');
+      assert.equal(out.reason, recordFails ? 'settlement_record_pending' : 'payment_settled');
+      assert.equal(out.receipt.transactionHash, evidence.txHash);
+      assert.equal(out.receipt.digest, evidence.digest);
+      assert.deepEqual(out.data, evidence.data);
+      assert.deepEqual(await tools.call('purchase_status', { authId: out.authId }), out);
+      assert.deepEqual(await tools.call('resume_purchase', { authId: out.authId }), out);
+      assert.deepEqual(await tools.call('buy_resource', args), out);
+      assert.equal(reads, 0);
+      assert.equal(calls, 1);
+      assert.equal(w.ledger.txs.size, 1);
+      assert.equal(w.guard.nextAuthId, 1n);
+    });
+  }
+}

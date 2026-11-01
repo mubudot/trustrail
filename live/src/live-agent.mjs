@@ -6,7 +6,7 @@ import { evaluate, dayOf } from '../../agent/src/policy/engine.mjs';
 import { purposeHash } from '../../agent/src/util/canonical.mjs';
 import { checkPayee } from '../../agent/src/identity/badge.mjs';
 import { nameOf } from '../../agent/src/policy/errors.mjs';
-import { getPaymentRequired, selectRequirements, buildTransfer, signAsKey, addSig, toJSON, payWith } from './x402-buyer.mjs';
+import { getPaymentRequired, selectRequirements, buildTransfer, signAsKey, addSig, toJSON, payWith, signingDigest } from './x402-buyer.mjs';
 import { CosignRefused } from './cosigner-live.mjs';
 import { CosignerUnavailable } from './cosigner-client.mjs';
 import { authorizeOutcome } from './guard-events.mjs';
@@ -105,6 +105,7 @@ export class LiveAgent {
     const notAfterS = Math.floor(Date.parse(view.auth.expires_at) / 1000);
     let tx = await buildTransfer(this.grpc, { sender: me.record.wallet, requirements, notAfterS });
     tx = signAsKey(tx, 0, this.walletKey0);
+    const digest = signingDigest(tx);
     let cosig;
     try {
       cosig = await this.cosigner.cosign({ authId, signableJSON: toJSON(tx), resourceUrl: url, requirements });
@@ -140,9 +141,9 @@ export class LiveAgent {
       rec = await this.guard.send('recordSettlement', { id: BigInt(authId), tx_hash: txHash }, { sender: this.agent.address, signer: this.agent.signer });
     } catch (e) {
       this.audit.append('settlement_record_failed', { authId, txHash, error: String(e?.code ?? e?.message ?? e) });
-      return { status: 'paid_unrecorded', authId, txHash, commitTx: this.cosigner.lastCommitTx, data: res.body };
+      return { status: 'paid_unrecorded', authId, txHash, digest, commitTx: this.cosigner.lastCommitTx, data: res.body };
     }
     this.audit.append('settled', { authId, txHash, recordTx: rec.txHash });
-    return { status: 'paid', authId, txHash, recordTx: rec.txHash, commitTx: this.cosigner.lastCommitTx, data: res.body };
+    return { status: 'paid', authId, txHash, digest, recordTx: rec.txHash, commitTx: this.cosigner.lastCommitTx, data: res.body };
   }
 }

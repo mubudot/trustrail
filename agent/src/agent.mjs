@@ -8,6 +8,7 @@ import { purposeHash } from './util/canonical.mjs';
 import { checkPayee } from './identity/badge.mjs';
 import { CosignRefused } from './cosigner/cosigner.mjs';
 import { buildAgentSignedTx, parsePaymentRequired, selectRequirements, submitPayment } from './payments/x402-client.mjs';
+import { signingDigest } from './payments/tx.mjs';
 
 export class TrustedAgent {
   constructor({ account, agentKey, guard, cosigner, resolver, audit, fetchImpl, nonceOf, network, clock = () => Date.now(), requireVerifiedPayee = true }) {
@@ -83,6 +84,7 @@ export class TrustedAgent {
       agentAccount: wallet, agentKey: this.agentKey, nonce: this.nonceOf(wallet),
       requirements, nowS: Math.floor(this.clock() / 1000), notAfterS: Number(auth.expiresAt / 1000n),
     });
+    const digest = signingDigest(tx);
     try {
       tx.signatures.sender[0][1] = await this.cosigner.cosign({ authId, tx, resourceUrl: url, requirements });
     } catch (e) {
@@ -111,9 +113,9 @@ export class TrustedAgent {
     } catch (e) {
       if (!(e instanceof GuardError)) throw e;
       this.audit.append('settlement_record_failed', { authId, txHash: settlement.transaction, reason: e.code });
-      return { status: 'paid_unrecorded', authId, txHash: settlement.transaction, reason: e.code, data: res.json };
+      return { status: 'paid_unrecorded', authId, txHash: settlement.transaction, digest, reason: e.code, data: res.json };
     }
     this.audit.append('settled', { authId, txHash: settlement.transaction, amount: BigInt(requirements.amount), payTo: requirements.payTo });
-    return { status: 'paid', authId, txHash: settlement.transaction, data: res.json };
+    return { status: 'paid', authId, txHash: settlement.transaction, digest, data: res.json };
   }
 }

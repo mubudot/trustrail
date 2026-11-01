@@ -44,6 +44,13 @@ owner-key approval still fails. Repeated successful resumes return the saved rec
 another payment. Purchases and quotes are kept in memory for this server session; restarting the
 server does not recover its queue.
 
+Paid receipts use the committed digest returned by the buyer, without another chain read. A
+failed receipt lookup therefore cannot discard a confirmed payment. An identical `buy_resource`
+call (same URL and intent) returns its saved paid or uncertain result within the session, including
+after resume; use a distinct intent for an intentional repeat purchase. Across server restarts or
+separate sessions there is no durable request identity or purchase cache, so duplicate purchases
+cannot be prevented: retain receipts and reconcile uncertain outcomes before starting a new one.
+
 If settlement is uncertain, the result stays `pending` with
 `settlement_unknown_do_not_retry`; an operator must reconcile it with the chain. A confirmed
 payment whose guard record failed returns `paid` with `settlement_record_pending`, its receipt
