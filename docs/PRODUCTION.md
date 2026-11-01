@@ -3,9 +3,14 @@
 **Where it stands.** TrustRail runs on Concordium **testnet** with CCD payments: guard contract,
 Agent Registry badges, payment-specific Verify-and-Access approvals, sponsored x402 settlement and
 an anchored audit log ([TESTNET.md](TESTNET.md)). Not yet delivered: a mainnet deployment, owner
-approval from the owner's own Concordium ID app, a co-signer on separate infrastructure, PLT
+approval from an owner-controlled Concordium wallet supporting an account-credential proof for the
+guard owner's account, a co-signer on separate infrastructure, PLT
 stablecoin settlement, and any external pilot. This page is the plan for those, with the gates that
 must pass before real money moves. Nothing below is claimed as done unless it links to code.
+
+The standalone Concordium ID App cannot supply this account-bound proof: account verification
+requires a wallet with account access ([Concordium: Select verification method](https://docs.concordium.com/en/mainnet/how-to/concordium-id/verify-and-access/select-verification-method.html)).
+Wallet transport and exact request compatibility remain to be demonstrated.
 
 ## First users
 
@@ -21,7 +26,7 @@ whose badge proves a verified human stands behind it.
 | --- | --- | --- | --- |
 | Network constants | `live/src/net.mjs` (`TESTNET`: gRPC host, x402 network id, registry `<12802,0>`) | a `MAINNET` profile: mainnet gRPC, the mainnet x402 network id, CIS-8004 `<10082,0>` / CIS-8 `<10081,0>`; select the profile by config, not by editing code | to do (small) |
 | Approval request | `live/src/human-approval.mjs`: testnet IdP 0 trusted, `did:ccd:testnet:` subjects, resource id `trustrail:ccd:testnet:…` | the same Verify-and-Access V1 request with mainnet DIDs and the mainnet identity providers the operator chooses to accept | to do (small); request format unchanged |
-| Who makes the proof | a script holding the test identity's seed | the owner's Concordium ID app answers the anchored request; the approval screen must show payee, amount, asset and purpose before the owner proves | to do — the main integration task |
+| Who makes the proof | a script holding the test identity's seed | an owner-controlled Concordium wallet supports an account-credential proof for the guard owner's account; the approval screen shows payee, amount, asset and purpose | to do — wallet transport and exact request compatibility remain to be demonstrated |
 | Owner identity | testnet IdP test identity, dummy attributes | a real identity from a mainnet IdP (passport + liveness in the Concordium wallet); disclosure only through Privacy Guardians and a court order | owner's own step |
 | Company owners | — | for a business, the approving owner account belongs to an authorised employee; linking it to the company's identity (e.g. LEI) is a later option, not implemented | planned |
 | Co-signer | `LiveCosigner` in the buyer's Node process (`live/src/world.mjs` loads both keys) | a separate service on separate infrastructure, run by the owner or a custodian; the agent calls it over an API with the same plain-JSON inputs `cosign()` takes today; key 1 in an HSM or a custody service | to do — required before mainnet |
@@ -76,8 +81,9 @@ custody service, come on top.
 
 1. **Separate custody.** Co-signer on its own host with its own key store; the agent process holds
    key 0 only. Re-run the attack suite and `verify` against that setup.
-2. **Owner approval in the owner's app.** A real owner approves a pending payment from the
-   Concordium ID app; the approval screen shows payee, amount and purpose.
+2. **Owner approval in the owner's wallet.** Demonstrate account-credential proof support for the
+   guard owner's account, the wallet transport and exact V1 request compatibility; show payee,
+   amount and purpose before approval.
 3. **Recovery tested.** Forced facilitator failure and forced `recordSettlement` failure are
    reconciled without a double payment.
 4. **External testnet pilot.** One outside team runs the agent against an independently operated

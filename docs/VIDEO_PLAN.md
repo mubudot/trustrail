@@ -18,7 +18,7 @@ callout that restates the key fact so it reads on a phone.
 | # | Time (approx.) | Screen | Narration |
 | --- | --- | --- | --- |
 | 1 | 0:00–0:16 | Title: "No verified human, no payment." · TrustRail · AI agent payments on Concordium · live on testnet | No verified human, no payment. TrustRail lets an AI agent pay other agents on Concordium, but every large payment needs a zero-knowledge proof that the verified owner approved it. Every payment you will see is a real transaction on Concordium testnet. |
-| 2 | 0:16–0:27 | The problem: caps + an approve button = a flag any owner-key holder can flip | Agents now pay for data and APIs over x402. Most agent wallets stop at a spending cap and an approve button, and anything holding the owner key can press it. |
+| 2 | 0:16–0:27 | The problem: caps + an approve button = a flag any owner-key holder can flip | Agents now pay for data and APIs over x402. A spending cap and an owner-key approve button cannot establish identity-backed approval. |
 | 3 | 0:27–0:50 | Diagram: agent (key 0) + co-signer (key 1) = 2-of-2 wallet; guard contract `<13037,0>`; Verify-and-Access proof bound to guard / authorisation / payee / amount | The agent's wallet is a native two-of-two Concordium account: the agent holds one key, a small co-signer holds the other. A guard contract enforces caps and the allowlist on chain. Above two CCD, the co-signer signs only after it re-verifies a Verify and Access proof from the owner's Concordium identity that names this guard, authorisation, payee and amount. |
 | 4 | 0:50–1:02 | Agent Registry badges: real `cd live && npm run check-badge` output (hosted Agent Registry MCP `check_badge`, read-only): buyer agent CIS-8004 token #977 and seller agent token #978, both VALID, Active, card hash matches on chain (card host shortened to its path on screen) | Both agents carry Agent Registry badges, tokens 977 and 978. The hosted registry reports both valid, and each agent card matches its hash on chain. |
 | 5 | 1:02–1:15 | CCDExplorer: real x402 settlement, sponsored transfer 0.5 CCD from the 2-of-2 wallet, Success (`86b08eae…`) | First, a half CCD weather feed. Under the threshold, the guard approves it, the co-signer commits the exact signing digest, and the x402 facilitator sponsors the transfer. |
@@ -31,5 +31,10 @@ callout that restates the key fact so it reads on a phone.
 | 12 | 2:42–2:58 | Honest limits + close: owner key = policy admin (co-signer pins its own threshold); demo co-signer shares the agent's Node process (production: separate service); 158 tests (contract 34 · agent 33 · live adapters 91); "No verified human, no payment." | What we do not claim: the owner key can change the policy; the co-signer pins its own threshold. In this demo the co-signer shares the agent's process; production needs it as a separate service. TrustRail. No verified human, no payment. |
 
 The video was recorded when the suites had 158 tests; current counts: [README](../README.md).
+
+Corrections for a future cut (the published recording is unchanged): at 0:20–0:27 replace the
+unsupported market comparison with the narrower sentence in scene 2 above. At 0:00–0:16 and
+1:20–1:34 add: “Testnet identity with dummy attributes; this recording generates the owner's proof
+by script.” Keep the total duration below three minutes.
 
 Build: a small render script (not part of this repository) assembles the scenes from the explorer captures, `check-badge`, `attacks` and `verify` output, narrates them with Piper, and writes `concordium_demo.mp4`.

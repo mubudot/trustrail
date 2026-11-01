@@ -121,6 +121,6 @@ anything. `npm run audit:doc -- --offline` skips chain reads and labels the outp
 
 ```bash
 npm run verify                    # 23 checks against testnet: badges, guard, ZK approval, settlements, anchor
-node tools/write-testnet-doc.mjs  # docs/TESTNET.md: every object and transaction with CCDExplorer links
+node tools/write-testnet-doc.mjs  # docs/TESTNET.md: deployment and selected demo transactions; full recorded list in COSTS.md, purchase lifecycles in AUDIT_LOG.md
 npm run audit:doc                 # docs/AUDIT_LOG.md: the Art. 12-style audit record, block times, anchor check
 ```

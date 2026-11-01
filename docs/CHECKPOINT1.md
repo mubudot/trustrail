@@ -8,8 +8,8 @@ dashboard's "Discord Integration" section to get the programme channels.
 
 **Description (≈100 words):**
 TrustRail lets an AI agent pay other agents and APIs with x402 on Concordium without handing it the
-owner's wallet. An on-chain guard contract enforces caps, an allowlist of badge-verified payees and an
-approval threshold. Above the threshold the payment needs a Concordium Verify-and-Access
+owner's wallet. The guard enforces caps, a payee allowlist and an approval threshold; the buyer and
+co-signer check payee badges before payment. Above the threshold the payment needs a Concordium Verify-and-Access
 zero-knowledge proof that the identity-verified owner approved that exact payment; the agent's 2-of-2
 wallet is co-signed only after that proof re-verifies against the chain. Both agents carry Verified
 by Concordium badges (CIS-8004), settlement is sponsored x402, and approval records plus the agent's

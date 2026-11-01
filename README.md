@@ -8,27 +8,29 @@ approved *that exact payment* — with the proof anchored on chain for audit.**
 on-chain policy; anything above 2 CCD needs the identity-verified owner to approve *that* purchase.
 
 **Judge start:** [verify it in a few minutes, no keys](docs/JUDGING.md) ·
-[every testnet transaction](docs/TESTNET.md) · [path to production](docs/PRODUCTION.md) ·
+[deployment and selected demo transactions](docs/TESTNET.md) · [path to production](docs/PRODUCTION.md) ·
 [measured fees per purchase](docs/COSTS.md) · [demo video (2:58)](https://youtu.be/lQQWTXewqcg).
 
 **Demo scope:** testnet identity with dummy attributes, the owner's proof made by a script, and the
-co-signer running in the buyer's process. Approval from the owner's own Concordium ID app and
-separate co-signer custody are production work ([plan](docs/PRODUCTION.md)).
+co-signer running in the buyer's process. Production approval must come from an owner-controlled
+Concordium wallet supporting an account-credential proof for the guard owner's account; wallet
+transport and request compatibility remain to be demonstrated. Separate co-signer custody is
+production work ([plan](docs/PRODUCTION.md)).
 
 Live on Concordium **testnet**: guard contract [<13037,0>](https://ccdexplorer.io/testnet/instance/13037/0),
 Verified-by-Concordium badges for both agents, real x402 settlements, ZK approval records and an
-anchored audit log. Every link: [docs/TESTNET.md](docs/TESTNET.md). The agent's Art. 12-style audit
-record, one CCDExplorer link per transaction: [docs/AUDIT_LOG.md](docs/AUDIT_LOG.md). Re-check it
-yourself without any key: `cd live && npm ci && npm run verify`.
+anchored audit log. Deployment and selected demo transactions: [TESTNET.md](docs/TESTNET.md).
+The full list of recorded transactions is in [COSTS.md](docs/COSTS.md), with purchase lifecycles
+and the Art. 12-style record in [AUDIT_LOG.md](docs/AUDIT_LOG.md). Re-check it without any key: `cd live && npm ci && npm run verify`.
 
 ## Why this is different from "caps + an approve button"
 
-Most agent wallets stop at a spend limit and a human-in-the-loop flag that any process holding
-the owner key can flip. TrustRail makes the human part *cryptographic and specific*:
+A spending cap and an owner-key approval transaction do not establish a separate,
+identity-credential-based approval of that payment. TrustRail binds that approval to the payment:
 
 1. **The approval is a Concordium Verify-and-Access proof**, made from the owner account's
    identity credential (testnet IdP): "I am an adult with a valid Concordium identity, and I hold
-   the credential of the account that owns this agent." No personal data is revealed.
+   the credential of the account that owns this agent." No raw identity attributes are disclosed.
 2. **The proof is bound to one payment.** The verification request is anchored on chain and names
    the guard, the authorisation id, the payee, the amount and the purpose hash. A valid proof for
    one payment cannot approve another (we tried — [docs/TESTNET.md](docs/TESTNET.md), row 4).
@@ -123,8 +125,9 @@ controls and optional read-only testnet checks.
   authorisation records remain the independent trail.
 - **Escrow mode is not proof-gated.** Escrow approvals pay from the contract directly, without the
   co-signer; the demo and the human-approval claim use x402 mode only.
-- The approval proof is made by a script holding the owner's testnet seed. In production the owner's
-  Concordium ID app answers the anchored request (same V1 format).
+- The approval proof is made by a script holding the owner's testnet seed. In production an
+  owner-controlled Concordium wallet must support an account-credential proof for the guard owner's
+  account; wallet transport and exact request compatibility remain to be demonstrated.
 
 ## Layout
 
@@ -143,7 +146,7 @@ live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 11
   tools/                   identity, accounts, faucet, deploy, badges/cards, check-badge, verify-testnet, doc generators
   demo/testnet.mjs         the live scenarios;  state/  public deployment record + evidence
   deployed/                the exact module + schema deployed on testnet
-docs/TESTNET.md      every address and transaction with CCDExplorer links
+docs/TESTNET.md      deployment and selected demo transactions with CCDExplorer links
 docs/AUDIT_LOG.md    the agent's audit log as an Art. 12-style record (CCDExplorer links, block times)
 docs/RUNBOOK.md      testnet from scratch: identity, accounts, guard, CIS-8004 badges, x402 payments
 docs/JUDGING.md      the short judge route: offline demo, read-only testnet check, key links
@@ -192,7 +195,8 @@ attack tests that print 27 contract refusals and 3 legitimate controls.
 ## Path to production
 
 What exists today is a testnet deployment with CCD payments. Before mainnet: the owner approves from
-their own Concordium ID app instead of a script, the co-signer moves to its own host and key store,
+an owner-controlled Concordium wallet supporting the guard owner's account-credential proof
+(wallet transport and request compatibility remain to be demonstrated), the co-signer moves to its own host and key store,
 mainnet registry and identity providers replace the testnet ones, budgets move to a PLT stablecoin,
 and a hosted facilitator sponsors settlement — then an external testnet pilot and a bounded mainnet
 launch. A small purchase costs about 5,550 energy (≈ €0.11 at the testnet chain parameters read on

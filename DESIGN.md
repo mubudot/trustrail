@@ -15,9 +15,9 @@ human stands behind the other side.
 | Judging axis | Our answer |
 | --- | --- |
 | Concordium identity | Owner is a Concordium account (every account is IdP-backed; testnet IP for the demo). The guard contract only lets an agent spend if its **CIS-8004 Agent Registry NFT is held by the guard owner** (checked on-chain via CIS-2 `balanceOf` at registration and re-checkable), so the badge, the owner and the spending policy are one chain of accountability. Payees can be required to show a valid *Verified by Concordium* badge (hosted MCP `check-badge`) before the agent pays them. |
-| Agent Registry | Agent registered in CIS-8004 (testnet `<12802,0>`), Agent Card with badge extension + `x402Support: true` + a `spendPolicy` pointer to the guard contract. |
+| Agent Registry | Agent registered in CIS-8004 (testnet `<12802,0>`), Agent Card with a badge extension; the buyer extension contains `services.spendGuard` and `services.paymentWallet`. |
 | Agent payments | x402 on Concordium (`@x402/concordium`, exact scheme, sponsored V1 transfer — agent needs no CCD for fees) **gated by an on-chain authorisation** in the guard contract; plus an on-chain escrow mode for agent-to-agent CCD payments. |
-| Accountability / EU AI Act Art. 12 | Every decision (authorised, pending human approval, approved, rejected, cancelled, settled with the x402 tx hash, refused attempts that were preflighted) is an on-chain event + record; the off-chain audit log is hash-chained and links each entry to the on-chain authorisation id and settlement tx. |
+| Accountability / EU AI Act Art. 12 | Guard lifecycle transitions emit on-chain events. Local preflight and badge refusals are recorded in the hash-chained log whose head is anchored; they are not individual contract events. The log links payment entries to authorisation ids and settlement transactions. |
 | Path to production | Same contract on mainnet; owner identity from a real IdP; badge from the official registry `<10082,0>`; co-signer run by the owner (or a custodian such as Dfns); PLT stablecoin (EURR/USDR) as the budget asset; sponsor service for fees. |
 
 ## Components
@@ -33,12 +33,12 @@ human stands behind the other side.
 |   paused? registered? asset? allowlisted? per-tx? daily?            |
 |   <= threshold -> Approved (Escrow: CCD transferred now)            |
 |   >  threshold -> Pending (budget reserved) -> owner approve/reject |
-| recordSettlement(id, x402 tx hash)  | cancel(id) | events = audit    |
+| recordSettlement(id, x402 tx hash) | cancel(id) | lifecycle events |
 +---------------------------------------------------------------------+
              ^ authorize / recordSettlement            ^ CIS-2 balanceOf
              |                                          | (badge owned by owner?)
    AI agent (untrusted)  ---x402--->  seller API      CIS-8004 Agent Registry
-       | builds sponsored V1 transfer (sender = agent account,
+       | builds sponsored V1 transfer (sender = the separate payment wallet,
        |   2-of-2 keys: agent key + guard co-signer key)
        v
    co-signer (deterministic, owner-run): signs ONLY if the tx exactly matches an
@@ -112,16 +112,16 @@ Presentation V1) proof** instead of a bare owner signature:
 
 ## Agent client (Node, `agent/`)
 
-- `policy.mjs` — pure JS mirror of the contract policy for **preflight** (refuse locally before
+- `agent/src/policy/engine.mjs` — pure JS mirror of the contract policy for **preflight** (refuse locally before
   spending gas; same error codes).
-- `x402-flow.mjs` — buyer flow: request → 402 + PaymentRequirements → preflight → on-chain
+- `agent/src/agent.mjs` + `agent/src/payments/x402-client.mjs` — buyer flow: request → 402 + PaymentRequirements → preflight → on-chain
   `authorize` → build sponsored V1 transfer → co-signer → retry with `PAYMENT-SIGNATURE` → record
   settlement.
-- `cosigner.mjs` — the binding check: payload shape, sender = agent wallet, payee/amount/asset equal the
+- `agent/src/cosigner/cosigner.mjs` — the binding check: payload shape, sender = agent wallet, payee/amount/asset equal the
   authorisation, tx expiry ≤ authorisation expiry and ≤ 10 min, one operation, sponsor ≠ payee,
   authorisation not yet consumed.
-- `badge.mjs` — counterparty badge check (hosted MCP REST in live mode, fixture in mock mode).
-- `audit.mjs` — hash-chained JSONL audit log.
+- `agent/src/identity/badge.mjs` — counterparty badge check (hosted MCP REST in live mode, fixture in mock mode).
+- `agent/src/audit/log.mjs` — hash-chained JSONL audit log.
 - `mock/` — in-memory chain (same policy), x402 seller + facilitator, so judges can run everything
   with no key and no network: `npm test`, `npm run demo:mock`.
 - Live mode (`live/`, implemented on testnet): `@concordium/web-sdk` + `@x402/concordium`, hosted
@@ -130,7 +130,8 @@ Presentation V1) proof** instead of a bare owner signature:
 ## Reused ideas
 
 - near-agent-spend-guard: on-chain caps/allowlist/threshold, pending with reserved budget, owner-only
-  admin, pause, generation counter, bounded state, events as audit, restricted agent key.
+  admin, pause, generation counter, bounded allowlists and validated inputs, lifecycle events,
+  restricted agent key. Authorisation and settlement history grow per purchase; there is no pruning.
 - paypal-guardrail-buyer: deterministic guardrail engine separate from the LLM, preflight with stable
   error codes, human approval queue, hash-chained audit, offline/mock mode for judges.
 
@@ -139,5 +140,5 @@ Presentation V1) proof** instead of a bare owner signature:
 - On-chain verification of ZK identity proofs (contracts cannot verify them; Verify and Access is
   verified off-chain — used for the payee/owner-attribute check in the client).
 - Protocol-Level Locks (W4) as an alternative to escrow — revisit after the workshop.
-- Whether the hosted x402 facilitator for Concordium testnet is public, or we run our own
-  (`@x402/concordium/exact/facilitator`, needs a funded sponsor account).
+- The demo runs its own local facilitator (`@x402/concordium/exact/facilitator`) with a funded
+  sponsor account. Production hosting and funding remain planned.

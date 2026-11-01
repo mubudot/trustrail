@@ -56,8 +56,9 @@ Concordium testnet only (no transaction is sent) and checks:
 | Agent skips its own checks, asks for 9 CCD → rejected on chain (`PerTxCap`) | [a7379c9cdd…](https://ccdexplorer.io/testnet/transaction/a7379c9cdde100c758f83a6d8aa8ca96ba934499713ab9da435499fb6e4de12d) |
 | Audit-log head anchored on the guard | [38d93421c1…](https://ccdexplorer.io/testnet/transaction/38d93421c1ca3ee7fcf5ffdc7ee3ba5b7ff2065c1adaa2595bac84605fb7bb9f) |
 
-Every other address and transaction: [TESTNET.md](TESTNET.md). The audit log as an
-Art. 12-style record: [AUDIT_LOG.md](AUDIT_LOG.md). Measured fees per flow: [COSTS.md](COSTS.md).
+Deployment and selected demo transactions: [TESTNET.md](TESTNET.md). Full list of recorded
+transactions: [COSTS.md](COSTS.md), with purchase lifecycles in the Art. 12-style
+[AUDIT_LOG.md](AUDIT_LOG.md).
 
 ## 4. What the demo does and does not show
 
@@ -65,8 +66,9 @@ Art. 12-style record: [AUDIT_LOG.md](AUDIT_LOG.md). Measured fees per flow: [COS
   Verify-and-Access proof before the co-signer releases key 1, sponsored x402 settlement, refusals
   of forged and replayed approvals, and an anchored audit log.
 - Demo scope: the identity is a testnet-IdP test identity with dummy attributes; the owner's proof
-  is made by a script holding that test identity (in production the owner's Concordium ID app
-  answers the same request); the co-signer runs in the buyer's Node process (in production it is a
+  is made by a script holding that test identity. Production approval requires an owner-controlled
+  Concordium wallet supporting an account-credential proof for the guard owner's account; wallet
+  transport and exact request compatibility remain to be demonstrated; the co-signer runs in the buyer's Node process (in production it is a
   separate service with its own key store); the seller and facilitator run locally.
 - Fixtures in the offline tests reproduce captured evidence; they do not prove the testnet badges
   or node are up today — step 2 does that.

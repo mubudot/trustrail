@@ -47,13 +47,14 @@
 ## Known limitations / next
 - The contract cannot verify ZK proofs; it records the proof hash and the co-signer enforces it.
   Escrow-mode approvals (contract pays directly) are therefore not proof-gated — demo uses x402 mode.
-- Approval proof is produced by a script holding the owner's seed (testnet). Production: the owner's
-  Concordium ID / wallet answers the anchored request (same V1 request format).
+- Approval proof is produced by a script holding the owner's seed (testnet). Production: an
+  owner-controlled Concordium wallet must support an account-credential proof for the guard owner's
+  account. Wallet transport and exact request compatibility remain to be demonstrated.
 - Seller + facilitator run locally during the demo; Agent Cards are on a temporary demo host
   (trustrail-204-44-110-122.sslip.io). For the final video, consider hosting cards on GitHub Pages
   once the repo is public.
-- Budget asset is CCD; PLT (EURR/USDR) transfers are supported by the policy and co-signer design but
-  not yet by the live buyer.
+- Budget asset is CCD. The policy and contract model PLT assets, but the live buyer, seller and
+  co-signer need a PLT transfer path; the co-signer currently rejects non-CCD transfers.
 - `setAgentWallet` on the registry is not used (the wallet is 2-of-2; the MCP builder expects one
   signature); the Agent Card lists the guard and payment wallet under `services`.
-- Payee badge checks run in the client; the on-chain allowlist still binds.
+- Payee badge checks run in both buyer and co-signer; the on-chain allowlist binds payee addresses.

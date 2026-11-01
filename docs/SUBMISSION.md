@@ -9,7 +9,7 @@ Due Wed 9 Dec 23:59 UTC. Every link below must open without signing in (the repo
 - Code: https://github.com/mubudot/trustrail
 - Demo video (2:58): https://youtu.be/lQQWTXewqcg
 - CCDExplorer: guard contract https://ccdexplorer.io/testnet/instance/13037/0
-  (every transaction: [TESTNET.md](https://github.com/mubudot/trustrail/blob/main/docs/TESTNET.md))
+  (deployment and selected demo transactions: [TESTNET.md](https://github.com/mubudot/trustrail/blob/main/docs/TESTNET.md); full list of recorded transactions: [COSTS.md](COSTS.md), with purchase lifecycles in [AUDIT_LOG.md](AUDIT_LOG.md))
 - Path to production: [PRODUCTION.md](https://github.com/mubudot/trustrail/blob/main/docs/PRODUCTION.md) · Judge route: [JUDGING.md](https://github.com/mubudot/trustrail/blob/main/docs/JUDGING.md)
 
 ## Description
@@ -20,9 +20,9 @@ accountable owner to approve *that* purchase with a Concordium identity proof; a
 is an audit trail anyone can check.
 
 How it works: a guard contract on Concordium enforces per-payment and daily caps, an allowlist of
-payees and an approval threshold. Before paying, the buyer checks the seller's Verified-by-Concordium
-badge through the hosted Agent Registry and requires it to be bound to the pay-to address. The
-agent's paying wallet is a native 2-of-2 Concordium account: the agent holds one key, a small
+payees and an approval threshold. Before paying, the buyer and co-signer check the seller's
+Verified-by-Concordium badge through the hosted Agent Registry and require it to be bound to the
+pay-to address. The agent's paying wallet is a native 2-of-2 Concordium account: the agent holds one key, a small
 co-signer holds the other. Above 2 CCD the co-signer signs only after it re-verifies a
 Verify-and-Access zero-knowledge proof from the owner account's identity credential, made for a
 request anchored on chain that names the guard, the authorisation, the payee, the amount and the
@@ -46,14 +46,15 @@ and facilitator run locally. No external pilot results are claimed.
 - Concordium ID / Verify and Access — payment-specific zero-knowledge approval, Verification Audit
   Record anchored on chain
 - Agent Registry (CIS-8004) + Verified by Concordium badge — both agents registered through the
-  hosted MCP; the guard checks badge ownership on chain; the buyer checks the payee's badge
+  hosted MCP; the guard checks buyer badge ownership on chain; the buyer and co-signer check payee badges
 - x402 on Concordium with sponsored transactions
 - Native multi-key accounts (the 2-of-2 wallet)
 
 ## Path to production (short)
 
-Mainnet needs: owner approval from the owner's own Concordium ID app, the co-signer as a separate
-service with its own key store, mainnet registry and identity providers, a PLT stablecoin budget,
+Mainnet needs: owner approval from an owner-controlled Concordium wallet supporting an
+account-credential proof for the guard owner's account (wallet transport and exact request
+compatibility remain to be demonstrated), the co-signer as a separate service with its own key store, mainnet registry and identity providers, a PLT stablecoin budget,
 funded control accounts and a hosted facilitator, then an external testnet pilot and a bounded
 mainnet launch. Measured fees per purchase: [COSTS.md](https://github.com/mubudot/trustrail/blob/main/docs/COSTS.md). Full plan with gates:
 [PRODUCTION.md](https://github.com/mubudot/trustrail/blob/main/docs/PRODUCTION.md).
