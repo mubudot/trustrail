@@ -86,12 +86,31 @@ test('service_reconciles_an_unrecorded_payment_when_the_wallet_nonce_advances', 
   const file = journal(t);
   const { client } = await serve(t, f, file);
   await client.cosign(f.input);
-  f.guard.grpc.getNextAccountNonce = async () => ({ nonce: SequenceNumber.create(8n) });
+  f.guard.grpc.getNextAccountNonce = async () => ({ nonce: SequenceNumber.create(8n), allFinal: true });
   const other = await another(f);
   await client.cosign(other);
   assert.equal(f.chain.authorization(f.input.authId).auth.status, 'Committed');
   assert.deepEqual(saved(file).map(r => [r.authId, r.nonce]), [[String(other.authId), '8']]);
 });
+
+for (const restart of [false, true]) {
+  test(`service_ignores_a_non_finalized_nonce_advance_restart_${restart}`, async t => {
+    const f = await small();
+    const file = journal(t);
+    let { client } = await serve(t, f, file);
+    await client.cosign(f.input);
+    // The node's estimate counts a transfer that is not finalized and may still be dropped.
+    f.guard.grpc.getNextAccountNonce = async () => ({ nonce: SequenceNumber.create(8n), allFinal: false });
+    assert.equal(await client.release(f.input.authId), false);
+    assert.deepEqual(saved(file).map(r => [r.authId, r.nonce]), [[String(f.input.authId), '7']]);
+    if (restart) ({ client } = await serve(t, f, file));
+    f.guard.grpc.getNextAccountNonce = async () => ({ nonce: SequenceNumber.create(7n), allFinal: true });
+    const other = await another(f);
+    await assert.rejects(client.cosign(other), refused);
+    assert.equal(f.chain.authorization(other.authId).auth.status, 'Approved');
+    assert.equal(f.guard.sent.filter(s => s.entry === 'commitPayment').length, 1);
+  });
+}
 
 test('service_clears_a_precommit_reservation_only_after_cancellation', async t => {
   const f = await small();

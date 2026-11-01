@@ -56,16 +56,18 @@ export class WalletNonces {
     const outstanding = [...this.reservations.values()].filter(r => r.wallet === wallet);
     if (!outstanding.length) return;
     // The SDK's getBlockInfo() without a hash selects lastFinal, never the local/buyer clock.
-    const [{ nonce }, { blockSlotTime }] = await Promise.all([
+    const [{ nonce, allFinal }, { blockSlotTime }] = await Promise.all([
       this.guard.grpc.getNextAccountNonce(AccountAddress.fromBase58(wallet)),
       this.guard.grpc.getBlockInfo(),
     ]);
-    const nextNonce = BigInt(nonce.value ?? nonce);
+    // The next-nonce estimate counts non-finalized transfers; only allFinal makes it consumption
+    // evidence. Otherwise the reservation waits for finality or for the signed expiry.
+    const nextNonce = allFinal === true ? BigInt(nonce.value ?? nonce) : null;
     const finalizedMs = blockSlotTime instanceof Date ? blockSlotTime.getTime() : NaN;
     if (!Number.isSafeInteger(finalizedMs) || finalizedMs < 0) throw new Error('invalid_finalized_block_time');
     const next = new Map(this.reservations);
     for (const r of outstanding) {
-      if (nextNonce > BigInt(r.nonce) || BigInt(finalizedMs) > BigInt(r.notAfterS) * 1000n) {
+      if ((nextNonce !== null && nextNonce > BigInt(r.nonce)) || BigInt(finalizedMs) > BigInt(r.notAfterS) * 1000n) {
         next.delete(key(r));
         continue;
       }

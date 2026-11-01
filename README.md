@@ -141,7 +141,7 @@ contract/            Rust smart contract agent_spend_guard (concordium-std 11), 
   src/audit.rs       anchorAudit (audit-log head on chain)
   src/admin.rs, badge.rs (CIS-8004 balanceOf check), views.rs, policy.rs, types.rs, events.rs, error.rs
 agent/               Offline reference client + mock chain (zero dependencies), 33 tests
-live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 161 offline tests
+live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 163 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
   src/cosigner-service.mjs / cosigner-client.mjs  opt-in authenticated HTTP boundary (offline tested)
@@ -184,7 +184,7 @@ One command for the offline contract + co-signer [attack demonstrations](docs/AT
 
 Reproducing the deployment from scratch (own throwaway testnet identity, accounts, faucet,
 contract, badges, demo) is scripted in `live/tools/`, step by step in [docs/RUNBOOK.md](docs/RUNBOOK.md).
-The suites contain **228 tests**: contract 34, agent 33, live 161. The offline Node attack runner
+The suites contain **230 tests**: contract 34, agent 33, live 163. The offline Node attack runner
 reports **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**; the root command also runs 7 Rust
 attack tests that print 27 contract refusals and 3 legitimate controls.
 

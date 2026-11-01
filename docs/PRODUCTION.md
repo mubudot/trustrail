@@ -88,7 +88,7 @@ Within one signing instance, signing and release are serialized per wallet. Befo
 the service reserves the wallet nonce for its authorization, digest and exact signed transfer
 header expiry (`notAfterS`, decimal epoch seconds); another authorization at that nonce receives
 `wallet_nonce_in_use` before `commitPayment`. A reservation clears only when the node's next wallet
-nonce advances past it, the last finalized block's slot time is **strictly past the signed transfer
+nonce advances past it with every wallet transaction finalized (`allFinal`), the last finalized block's slot time is **strictly past the signed transfer
 expiry**, or the guard reports Cancelled. The contract allows cancellation only before commitment,
 when no co-signer signature has been released. A buyer can write a Settled record with an invented
 hash, so Settled alone leaves the reservation in place.
@@ -122,7 +122,8 @@ Offline tests use generated keys, the actual approval verifier with captured pub
 responses, mock guard transitions, HTTP on loopback, and fake settlement responses. They cover
 small and proof-required buyer payments, forged proofs, pinned settings, authentication,
 key separation, cancellation receipts, malformed/lost responses, a same-authorization replica race,
-different-authorization nonce conflicts within one service, forged settlement records, finalized-time
+different-authorization nonce conflicts within one service, forged settlement records, non-finalized
+nonce advances, finalized-time
 expiry recovery after lost responses and restart, failed chain-time reads and journal version rejection.
 They do not establish
 separate host custody, a live owner wallet integration or a new testnet settlement.
