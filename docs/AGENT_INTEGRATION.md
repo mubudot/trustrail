@@ -78,7 +78,8 @@ and reject forged proofs and changes to amount, payee or URL.
 `--world testnet` wraps `createLiveWorld()` and `LiveAgent` with the same tool contract. It uses
 existing runtime credentials, real testnet guard/badge/x402 adapters and the live audit log.
 An operator must supply a real seller URL (the default local seller uses port 4402), and create
-valid owner approval outside MCP. This mode sends transactions and writes the live log when used;
+valid owner approval outside MCP. With the [remote co-signer configuration](PRODUCTION.md#separate-co-signer-service-offline-tested),
+the buyer loads wallet key 0 only and expects an external seller. This mode sends transactions and writes the live log when used;
 it was **not exercised for this integration**. The recorded testnet runs predate MCP. The local
 testnet seller now serves the same labelled synthetic content, but the recorded response bodies
 remain historical evidence. No external agent pilot or independently operated seller is claimed.

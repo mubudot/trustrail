@@ -75,7 +75,9 @@ transactions: [COSTS.md](COSTS.md), with purchase lifecycles in the Art. 12-styl
   is made by a script holding that test identity. Production approval requires an owner-controlled
   Concordium wallet supporting an account-credential proof for the guard owner's account; wallet
   transport and exact request compatibility remain to be demonstrated; the co-signer runs in the buyer's Node process (in production it is a
-  separate service with its own key store); the seller and facilitator run locally.
+  separate service with its own key store); the seller and facilitator run locally. The HTTP service
+  boundary is now implemented and tested offline, but separate custody has not been demonstrated
+  on testnet yet.
 - Fixtures in the offline tests reproduce captured evidence; they do not prove the testnet badges
   or node are up today — step 2 does that.
 

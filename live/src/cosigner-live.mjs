@@ -38,7 +38,14 @@ export class LiveCosigner {
    */
   constructor(o) { Object.assign(this, { clock: () => Date.now(), checkApproval: checkApprovalOnChain, ...o }); }
 
-  async cosign({ authId, signableJSON, resourceUrl, requirements }) {
+  async cosign(input) {
+    const result = await this.cosignWithReceipt(input);
+    this.lastCommitTx = result.commitTx;
+    return result.signature;
+  }
+
+  /** Per-call receipts let a service handle concurrent requests without shared receipt state. */
+  async cosignWithReceipt({ authId, signableJSON, resourceUrl, requirements }) {
     const no = (r) => { throw new CosignRefused(r); };
     const view = await this.guard.authorization(authId);
     if (!view) no('unknown_authorization');
@@ -110,19 +117,25 @@ export class LiveCosigner {
       if (issue) no(issue);
     }
 
+    let commitTx;
     try {
       const c = await this.guard.send('commitPayment', { id: BigInt(authId), digest }, { sender: this.account.address, signer: this.account.signer });
-      this.lastCommitTx = c.txHash;
+      commitTx = c.txHash;
     } catch (e) { no(`commit_${e.code ?? 'failed'}`); }
-    return signDigestWithKey(this.walletKey, digest);
+    return { signature: signDigestWithKey(this.walletKey, digest), commitTx, digest };
   }
 
   /** Cancel an authorisation the co-signer refused before committing (frees its budget). */
   async release(authId) {
+    const result = await this.releaseWithReceipt(authId);
+    this.lastCancelTx = result.cancelTx;
+    return result.released;
+  }
+
+  async releaseWithReceipt(authId) {
     try {
       const r = await this.guard.send('cancel', BigInt(authId), { sender: this.account.address, signer: this.account.signer });
-      this.lastCancelTx = r.txHash;
-      return true;
-    } catch { return false; }
+      return { released: true, cancelTx: r.txHash };
+    } catch { return { released: false, cancelTx: null }; }
   }
 }

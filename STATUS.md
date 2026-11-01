@@ -33,6 +33,11 @@
   additionally print 27 contract refusals and 3 legitimate controls.
 
 ## Changes in this round
+- Added stdio MCP purchasing tools with useful synthetic data and an actual scripted client transcript
+  ([integration](docs/AGENT_INTEGRATION.md)); reference mode tested, MCP testnet mode not exercised.
+- Added authenticated HTTP co-signer service/client and a buyer configuration containing wallet key 0
+  only. Offline tests cover the boundary; recorded testnet runs used the in-process co-signer.
+  Separate custody has not been demonstrated on testnet yet.
 - Added offline attacks through the production co-signer, real approval/ZK verifier, badge client,
   mock guard, audit anchor and settlement verifier, plus real Wasm contract attacks. Read-only
   testnet checks verify the real approval and refuse replay/card tampering without keys or sends.

@@ -4,9 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { testnetClient, TESTNET } from './net.mjs';
 import { deployedGuard } from './guard-instance.mjs';
-import { loadAccounts, roleSigner } from './signers.mjs';
+import { loadAccounts, loadBuyerAccounts, roleSigner } from './signers.mjs';
 import { readState, STATE_FILE } from './state.mjs';
 import { LiveCosigner } from './cosigner-live.mjs';
+import { CosignerClient } from './cosigner-client.mjs';
 import { LiveAgent } from './live-agent.mjs';
 import { createFacilitator, createSellerApp, listen } from './x402-seller.mjs';
 import { AuditLog } from '../../agent/src/audit/log.mjs';
@@ -29,12 +30,24 @@ export function loadApproval(id) {
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
 }
 
-export async function createLiveWorld() {
+export async function createLiveWorld({ cosignerUrl = process.env.TRUSTRAIL_COSIGNER_URL,
+  cosignerToken = process.env.TRUSTRAIL_COSIGNER_TOKEN,
+  buyerConfigFile = process.env.TRUSTRAIL_BUYER_CONFIG, audit: suppliedAudit } = {}) {
   const grpc = testnetClient();
   const st = readState();
-  const acc = loadAccounts();
   const guard = deployedGuard(grpc);
   const resolver = new HostedBadgeResolver();
+  if (cosignerUrl) {
+    // This branch never loads the shared demo secret bundle or starts the local seller/facilitator.
+    const acc = loadBuyerAccounts(buyerConfigFile);
+    if (acc.agent.address !== st.guard.agent || acc.wallet.address !== st.guard.wallet) throw new Error('buyer accounts do not match deployment');
+    const cosigner = new CosignerClient({ url: cosignerUrl, token: cosignerToken });
+    const audit = suppliedAudit ?? new AuditLog({ file: AUDIT_FILE });
+    const agent = new LiveAgent({ grpc, guard, agent: { address: acc.agent.address, signer: roleSigner(acc.agent) },
+      walletKey0: acc.wallet.keys[0].privateKey, cosigner, resolver, audit, network: TESTNET.x402Network });
+    return { grpc, st, acc, guard, cosigner, audit, agent, close: () => {} };
+  }
+  const acc = loadAccounts();
   const cosigner = new LiveCosigner({
     resolver, // the co-signer re-checks the payee badge itself, right before it commits
     guard, account: { address: acc.cosigner.address, signer: roleSigner(acc.cosigner) },
@@ -44,7 +57,7 @@ export async function createLiveWorld() {
     // Pinned from the co-signer's own record of the registered policy, not read live from chain.
     humanProofAbove: BigInt(st.guard.policy.approval_threshold),
   });
-  const audit = new AuditLog({ file: AUDIT_FILE });
+  const audit = suppliedAudit ?? new AuditLog({ file: AUDIT_FILE });
   const facilitator = createFacilitator({ address: acc.facilitator.address, privateKey: acc.facilitator.keys[0].privateKey });
   // Fixed ports: the purpose hash binds the resource URL, and pending purchases resume in a later run.
   const seller = await listen(createSellerApp({ payTo: acc.seller.address, badge: st.badges.seller.tokenAddress, facilitator, items: ITEMS }), 4402);

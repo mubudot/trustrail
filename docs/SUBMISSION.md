@@ -39,7 +39,9 @@ verifiers.
 
 Demo scope, stated plainly: the owner identity is a testnet-IdP test identity with dummy attributes,
 the owner's proof is produced by a script, the co-signer runs in the buyer's process, and the seller
-and facilitator run locally. No external pilot results are claimed.
+and facilitator run locally. MCP purchasing tools and an authenticated HTTP co-signer service are
+now implemented and tested offline; their use with separate custody has not been demonstrated on
+testnet. No external pilot results are claimed.
 
 ## Concordium components used
 

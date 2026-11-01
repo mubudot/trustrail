@@ -68,7 +68,8 @@ x402 payment. So:
 
 The live testnet demo uses a native 2-of-2 wallet: the agent signs key 0, and the co-signer checks
 and commits the transfer before signing key 1. Both keys currently run in the buyer process;
-separate co-signer custody remains production work. Mock mode exercises the same signing policy.
+an opt-in HTTP service boundary is now tested offline, but separate custody has not been
+demonstrated on testnet. Mock mode exercises the same signing policy.
 
 ## Verified-human approval (live since 2026-10-31)
 

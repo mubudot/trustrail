@@ -16,7 +16,7 @@ on-chain policy; anything above 2 CCD needs the identity-verified owner to appro
 co-signer running in the buyer's process. Production approval must come from an owner-controlled
 Concordium wallet supporting an account-credential proof for the guard owner's account; wallet
 transport and request compatibility remain to be demonstrated. Separate co-signer custody is
-production work ([plan](docs/PRODUCTION.md)). The [MCP purchasing tools](docs/AGENT_INTEGRATION.md)
+not yet demonstrated on testnet ([plan](docs/PRODUCTION.md)). The [MCP purchasing tools](docs/AGENT_INTEGRATION.md)
 are implemented and tested in the offline reference world; their testnet mode has not been exercised.
 
 Live on Concordium **testnet**: guard contract [<13037,0>](https://ccdexplorer.io/testnet/instance/13037/0),
@@ -97,9 +97,10 @@ controls and optional read-only testnet checks.
   both wallet keys into one process for convenience, so the demo shows an agent whose *logic* is
   subverted (e.g. it skips its own preflight and calls the guard directly — row 6), not one whose
   host is fully compromised. Someone with code execution in that process could read key 1 and sign
-  alone. In a real deployment the co-signer is a separate service (own host, own key store; the
-  owner or a custodian) that the agent reaches over an API; `LiveCosigner.cosign()` is already that
-  boundary (plain-JSON inputs, a signature or a refusal out).
+  alone. An authenticated HTTP co-signer service and client are implemented and tested offline,
+  including separate buyer configuration with wallet key 0 only and a race between service replicas
+  ([setup](docs/PRODUCTION.md#separate-co-signer-service-offline-tested)). The recorded testnet runs
+  used the in-process co-signer; separate custody has not been demonstrated on testnet yet.
 - **The co-signer is trusted to follow the rules.** Its key is half of the 2-of-2 wallet; if it is
   stolen together with the agent key, the wallet can be drained. It is deterministic, small and
   open source so it can be audited and run by the owner or a custodian.
@@ -142,6 +143,8 @@ agent/               Offline reference client + mock chain (zero dependencies), 
 live/                Testnet adapters (@concordium/web-sdk 12, @x402/* 2.29), 110 offline tests
   src/human-approval.mjs   Verify-and-Access V1: request -> ZK presentation -> audit record -> re-check
   src/cosigner-live.mjs    the co-signer (key 1 of the 2-of-2 wallet)
+  src/cosigner-service.mjs / cosigner-client.mjs  opt-in authenticated HTTP boundary (offline tested)
+  src/mcp/                 purchasing tools + stdio MCP server (reference/testnet worlds)
   src/live-agent.mjs       buyer pipeline;  src/x402-buyer.mjs / x402-seller.mjs  real x402
   src/guard-client.mjs     schema-typed guard calls;  src/registry-mcp.mjs  hosted Agent Registry MCP
   src/audit-anchor.mjs     anchor check;  src/audit-report.mjs  Art. 12-style audit record (docs/AUDIT_LOG.md)

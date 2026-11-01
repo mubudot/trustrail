@@ -29,13 +29,65 @@ whose badge proves a verified human stands behind it.
 | Who makes the proof | a script holding the test identity's seed | an owner-controlled Concordium wallet supports an account-credential proof for the guard owner's account; the approval screen shows payee, amount, asset and purpose | to do — wallet transport and exact request compatibility remain to be demonstrated |
 | Owner identity | testnet IdP test identity, dummy attributes | a real identity from a mainnet IdP (passport + liveness in the Concordium wallet); disclosure only through Privacy Guardians and a court order | owner's own step |
 | Company owners | — | for a business, the approving owner account belongs to an authorised employee; linking it to the company's identity (e.g. LEI) is a later option, not implemented | planned |
-| Co-signer | `LiveCosigner` in the buyer's Node process (`live/src/world.mjs` loads both keys) | a separate service on separate infrastructure, run by the owner or a custodian; the agent calls it over an API with the same plain-JSON inputs `cosign()` takes today; key 1 in an HSM or a custody service | to do — required before mainnet |
+| Co-signer | recorded runs: `LiveCosigner` in the buyer's Node process; authenticated HTTP service/client and separate buyer config implemented and tested offline | separate infrastructure run by the owner or a custodian; key 1 in an HSM or custody service | service boundary implemented; separate custody has not been demonstrated on testnet yet |
 | Custody service (e.g. Dfns) | — | must be shown to sign a Concordium transaction digest for one key of a native multi-key account; until demonstrated, an HSM-backed co-signer is the fallback | unverified |
 | Agent badge | testnet registry, Agent Cards on a temporary host | mainnet registry; Agent Cards on a durable host whose bytes match the pinned hash | to do (small) |
 | Budget asset | CCD | a PLT stablecoin (e.g. EURR/USDR, subject to availability). The policy and contract already model a PLT asset; the live buyer, seller and co-signer accept CCD simple transfers only (`live/src/cosigner-live.mjs` refuses anything else) and need a PLT transfer path with token id and decimals checks | to do |
 | Fees | x402 settlement sponsored by a facilitator we run; control transactions paid by the agent, owner and co-signer accounts | a hosted facilitator (or the seller's) sponsors settlements; the operator funds the control accounts — see costs below | to do |
 | Escrow mode | exists in the contract, not proof-gated | disabled for mainnet (x402 mode only), because the contract cannot check the human proof itself | config |
 | Contract | `<13037,0>`, no upgrade entrypoint | fresh deployment of the same module after an external review; policy changes stay with the owner key, the co-signer keeps its own pinned threshold | to do |
+
+## Separate co-signer service (offline tested)
+
+[`cosigner-service.mjs`](../live/src/cosigner-service.mjs) holds wallet key 1 and the co-signer
+control credential. It wraps the existing proof, transaction, policy and badge checks.
+[`cosigner-client.mjs`](../live/src/cosigner-client.mjs) exposes the same `cosign()` / `release()`
+interface used by the buyer. The default wiring remains in process; **all recorded testnet runs
+used it. Separate custody has not been demonstrated on testnet yet.**
+
+The operator provisions two separate credential files, outside the checkout and with restrictive
+file permissions. No export or migration of the demo's existing secrets was performed for this
+implementation. Running two processes against the same all-roles bundle would not establish
+separate custody.
+
+| File | Required shape / contents |
+| --- | --- |
+| Buyer config | Exactly `agent` and `wallet`, each with `address` and `keys: {"0": {"privateKey": …, "publicKey": …}}`; optional `threshold`. These are the agent control key and payment wallet key 0. Additional roles or wallet key 1 are rejected. |
+| Service config | `network` (testnet x402 network id), `guard: {index, subindex}`, `owner`, `agent`, `humanProofAbove` (decimal microCCD), `agentPublicKey` (wallet key 0 public key), `walletKey` (wallet key 1 private key), `account` (co-signer control address and `keys[0]` pair), `approvalsDir` (public verifier records, relative to the config file). |
+
+The service pins its **own** guard, network, owner, agent, threshold and badge resolver on startup.
+Its badge resolver is the hosted registry adapter. The request cannot change any of these, supply
+an approval record, or turn off badge checks. The service reads approval records from its own
+verifier directory; their ZK proof and anchors are still checked against the chain.
+
+In the service environment, set `TRUSTRAIL_COSIGNER_CONFIG` to its dedicated file and
+`TRUSTRAIL_COSIGNER_TOKEN` to a shared random bearer secret (at least 32 characters), then run
+`(cd live && npm run cosigner:serve)`. It listens on loopback port 4410 by default; host/port can
+be set with `TRUSTRAIL_COSIGNER_HOST` / `TRUSTRAIL_COSIGNER_PORT`. Use HTTPS for a separate host
+(the client permits plain HTTP only on loopback), with the service behind the TLS endpoint.
+
+In the buyer environment, set `TRUSTRAIL_BUYER_CONFIG` to its dedicated file,
+`TRUSTRAIL_COSIGNER_URL` to the service endpoint, and the same `TRUSTRAIL_COSIGNER_TOKEN`.
+`createLiveWorld()` then loads only that buyer file, constructs the HTTP client, and does not
+load the all-roles secret store or start the local seller/facilitator. Use an independently
+operated seller URL. This opt-in wiring also applies to MCP `--world testnet`; it has not been
+run against testnet. Neither command is part of the offline verification route.
+
+`POST /cosign` accepts only `{authId, signableJSON, resourceUrl, requirements}` (authId is a decimal
+string). Success returns `{authId, status: "signed", signature, receipt: {commitTx, digest}}`.
+`POST /release` accepts only `{authId}` for this service's agent; its response contains
+`{authId, status: "released", released, receipt: {cancelTx}}`. Refusals carry `status: "refused"`
+and a stable `reason`; missing authentication returns HTTP 401. Signing refusals do not
+implicitly cancel: the buyer calls `release()` and receives that cancellation's receipt.
+A lost signing response is an unknown outcome, preserved for reconciliation without cancellation
+or payment retry. Per-call receipts avoid sharing mutable receipt state across HTTP requests;
+the guard's atomic `commitPayment` still ensures only one replica releases a signature.
+
+Offline tests use generated keys, the actual approval verifier with captured public chain
+responses, mock guard transitions, HTTP on loopback, and fake settlement responses. They cover
+small and proof-required buyer payments, forged proofs, pinned settings, authentication,
+key separation, cancellation receipts, lost responses and a replica race. They do not establish
+separate host custody, a live owner wallet integration or a new testnet settlement.
 
 ## Recovery and operations
 
