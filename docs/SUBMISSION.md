@@ -6,8 +6,8 @@ Due Wed 9 Dec 23:59 UTC. Every link below must open without signing in (the repo
 
 **Links**
 
-- Code: https://github.com/mubudot/trustrail (must be public before submitting)
-- Demo video (2:58): *add the public video URL here and in the README once it is uploaded*
+- Code: https://github.com/mubudot/trustrail
+- Demo video (2:58): https://youtu.be/lQQWTXewqcg
 - CCDExplorer: guard contract https://ccdexplorer.io/testnet/instance/13037/0
   (every transaction: [TESTNET.md](https://github.com/mubudot/trustrail/blob/main/docs/TESTNET.md))
 - Path to production: [PRODUCTION.md](https://github.com/mubudot/trustrail/blob/main/docs/PRODUCTION.md) · Judge route: [JUDGING.md](https://github.com/mubudot/trustrail/blob/main/docs/JUDGING.md)

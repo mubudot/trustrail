@@ -9,7 +9,7 @@ on-chain policy; anything above 2 CCD needs the identity-verified owner to appro
 
 **Judge start:** [verify it in a few minutes, no keys](docs/JUDGING.md) ·
 [every testnet transaction](docs/TESTNET.md) · [path to production](docs/PRODUCTION.md) ·
-[measured fees per purchase](docs/COSTS.md) · demo video (2:58): public link pending approved upload.
+[measured fees per purchase](docs/COSTS.md) · [demo video (2:58)](https://youtu.be/lQQWTXewqcg).
 
 **Demo scope:** testnet identity with dummy attributes, the owner's proof made by a script, and the
 co-signer running in the buyer's process. Approval from the owner's own Concordium ID app and

@@ -1,4 +1,4 @@
-# Status (2026-10-31, updated 17:30 Taipei)
+# Status (2026-10-31, updated 09:30 UTC)
 
 ## Live on Concordium testnet (details and links: docs/TESTNET.md)
 - Throwaway test identity from the **Concordium testnet IdP** (its own dummy attributes, no real

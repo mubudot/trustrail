@@ -1,7 +1,7 @@
 # Concordium Trusted Agents Hackathon (Encode Club) — rules digest
 
 Read 2026-10-30 from the official programme page and its linked material. Times are given in UTC
-(as published) and Asia/Taipei (UTC+8).
+(as published).
 
 Sources:
 - Programme page + FAQ: https://www.encodeclub.com/programmes/concordium-trusted-agents-hackathon
@@ -16,7 +16,7 @@ Sources:
 
 | Item | What the page says |
 | --- | --- |
-| Format | Free, online, 6 weeks. Weeks 1–3: six 60-min workshops (Mon/Wed 15:00 UTC = 23:00 Taipei). Weeks 4–6: testnet build, office hours Tue/Fri 15:00 UTC. |
+| Format | Free, online, 6 weeks. Weeks 1–3: six 60-min workshops (Mon/Wed 15:00 UTC). Weeks 4–6: testnet build, office hours Tue/Fri 15:00 UTC. |
 | Tracks | **None.** The five directions are "starting points, not tracks": existing agent + badge/ERC-8004/x402; verified agents (registry + Agent Card + badge check over MCP/A2A); private verified users (Concordium ID / Verify and Access, e.g. age gate); agent commerce (x402 + sponsored transactions); accountable agents (EU AI Act Art. 12 audit trail, lawful route back to an owner). |
 | Prizes | **Not published** anywhere on the programme page or in the Terms. The Terms only say: "All prize announcements made at The Event are tentative and subject to change." Re-check at the 2 Nov launch. |
 | Solo | Allowed (FAQ 5: "You can build solo or in a team"). |
@@ -26,15 +26,15 @@ Sources:
 
 ## Key dates
 
-| Event | UTC | Taipei |
-| --- | --- | --- |
-| Launch + team formation | Mon 2 Nov 14:30 | Mon 2 Nov 22:30 |
-| Workshops 1–6 | 2, 4, 9, 11, 16, 18 Nov, 15:00 | same days 23:00 |
-| Build window opens | Thu 19 Nov | Thu 19 Nov |
-| **Checkpoint 1** | **Sun 22 Nov 23:59** | **Mon 23 Nov 07:59** |
-| Office hours | 24, 27 Nov; 1, 4 Dec; final walkthrough 8 Dec, 15:00 | 23:00 same days |
-| **Final submission closes** | **Wed 9 Dec 23:59** | **Thu 10 Dec 07:59** |
-| Judging | 10–11 Dec | — |
+| Event | UTC |
+| --- | --- |
+| Launch + team formation | Mon 2 Nov 14:30 |
+| Workshops 1–6 | 2, 4, 9, 11, 16, 18 Nov, 15:00 |
+| Build window opens | Thu 19 Nov |
+| **Checkpoint 1** | **Sun 22 Nov 23:59** |
+| Office hours | 24, 27 Nov; 1, 4 Dec; final walkthrough 8 Dec, 15:00 |
+| **Final submission closes** | **Wed 9 Dec 23:59** |
+| Judging | 10–11 Dec |
 
 Late submissions can't be judged; the platform locks at the deadline (FAQ 13).
 
@@ -102,17 +102,17 @@ description of what you plan to build. It does not need to be finished.
 
 Read from the logged-in Encode dashboard on 2026-10-31 (no changes made there):
 - Programme status: **Registered** (programme page) — dashboard → My Programmes → this hackathon.
-- **Checkpoint 1** (by Sun 22 Nov 23:59 UTC = **Mon 23 Nov 07:59 Taipei**): "No submission requirements set
+- **Checkpoint 1** (by **Sun 22 Nov 23:59 UTC**): "No submission requirements set
   for this checkpoint"; it is done by **creating the Project** on the dashboard (fields: Project Name,
   Description (optional), Project Image (optional); solo = just you; or join via Team Join Code).
   Paste-ready text: `docs/CHECKPOINT1.md`. Also connect Discord in the dashboard's "Discord Integration"
   section (programme channels + role).
-- **Final** (Checkpoint 2, by Wed 9 Dec 23:59 UTC = Thu 10 Dec 07:59 Taipei, from the project page):
+- **Final** (Checkpoint 2, by Wed 9 Dec 23:59 UTC, from the project page):
   description + Concordium components, public repo, demo video ≤ 3 min, CCDExplorer link, path to
   production; "Make sure every link is public."
 - Prizes: still not published. No AI-tool rule, no eligibility/KYC/payout rule published.
 
 The testnet build no longer needs anything from the user: the throwaway testnet identity (Concordium
 testnet IdP, dummy attributes) and accounts were created by script; keys live in `live/.secrets/`
-(gitignored). User steps left: (1) create the project + connect Discord before 23 Nov 07:59 Taipei;
+(gitignored). User steps left: (1) create the project + connect Discord before 22 Nov 23:59 UTC;
 (2) approve making the repo public, the video upload and the final submission.

@@ -13,7 +13,7 @@ You can review the protections locally with `bash scripts/attacks.sh` from the r
 
 What is left needs your account or your decision:
 
-1. **Checkpoint 1, by Mon 23 Nov 07:59 Taipei (Sun 22 Nov 23:59 UTC).** On the Encode dashboard
+1. **Checkpoint 1, by Sun 22 Nov 23:59 UTC.** On the Encode dashboard
    (Concordium Trusted Agents Hackathon → Create Project) paste the name and description from
    [CHECKPOINT1.md](CHECKPOINT1.md). The programme opens on 2 Nov; you can also just tell the
    assistant to do it with your saved Encode login.
@@ -25,7 +25,7 @@ What is left needs your account or your decision:
    are only `VALID` while their cards are served at the pinned URL (today a temporary host on the
    project VPS). Once the repo is public the cards can move to GitHub Pages; that needs one free
    testnet `setAgentURI` per badge (`publish-agent-cards.mjs --pin`), which the assistant can run.
-5. **Final submission, by Thu 10 Dec 07:59 Taipei.** Submit on the Encode dashboard with the repo
+5. **Final submission, by Wed 9 Dec 23:59 UTC.** Submit on the Encode dashboard with the repo
    link, the video link and a CCDExplorer link (guard `<13037,0>`:
    https://ccdexplorer.io/testnet/instance/13037/0).
 

@@ -1,4 +1,4 @@
-# Checkpoint 1 — what to paste on the Encode dashboard (due Sun 22 Nov 23:59 UTC = Mon 23 Nov 07:59 Taipei)
+# Checkpoint 1 — what to paste on the Encode dashboard (due Sun 22 Nov 23:59 UTC)
 
 Dashboard → Concordium Trusted Agents Hackathon → **Create Project** (fields: Project Name,
 Description (optional), Project Image (optional)). Solo team = just you. Also connect Discord in the
