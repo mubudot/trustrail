@@ -30,6 +30,8 @@ test('mcp_pending_purchase_cannot_self_approve', async () => {
   assert.deepEqual(PURCHASE_TOOLS.map(t => t.name), ['buy_resource', 'purchase_status', 'resume_purchase']);
   const pending = await tools.call('buy_resource', dataset);
   assert.deepEqual(pending, { status: 'pending', reason: 'owner_approval_required', authId: '0' });
+  assert.deepEqual(await tools.call('buy_resource', dataset), pending);
+  assert.equal(w.guard.nextAuthId, 1n);
   assert.deepEqual(await tools.call('resume_purchase', { authId: pending.authId }), pending);
   assert.equal(w.guard.authorization(pending.authId).auth.status, 'Pending');
   assert.equal((await tools.call('approve', { authId: pending.authId })).reason, 'unknown_tool');
@@ -51,13 +53,16 @@ test('mcp_resume_preserves_original_quote_binding_after_valid_owner_approval', a
   const binding = purposeHash(original.url, original.requirements);
   w.humanApprove(pending.authId); // fixture owner API is never exposed over MCP
   assert.equal((await tools.call('purchase_status', { authId: pending.authId })).reason, 'approval_recorded_resume_to_verify');
+  assert.deepEqual(await tools.call('buy_resource', dataset), pending);
   const [out, repeated] = await Promise.all([tools.call('resume_purchase', { authId: pending.authId }), tools.call('resume_purchase', { authId: pending.authId })]);
   assert.equal(out.status, 'paid');
   assert.equal(out.data.demo, true);
   assert.equal(out.data.rows.length, 3);
   assert.equal(w.guard.authorization(pending.authId).auth.purposeHash, binding);
   assert.deepEqual(out, repeated);
+  assert.deepEqual(await tools.call('buy_resource', dataset), out);
   assert.equal(w.ledger.txs.size, 1);
+  assert.equal(w.guard.nextAuthId, 1n);
 });
 
 for (const field of ['amount', 'payee', 'url']) {

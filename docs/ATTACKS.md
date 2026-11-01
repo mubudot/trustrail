@@ -27,8 +27,8 @@ succeed. Unexpected acceptance, a different refusal, an exception or a failed co
 auto-approved payment, an active badge with its original card, and settlement/audit verification.
 The Rust tests also demonstrate legitimate pre-expiry, unpause and new-generation operations.
 
-Measured suites: **202 tests** — contract **9 unit + 25 integration = 34**, agent **33**, live
-**135**. The Node runner prints **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. The 7 new
+Measured suites: **223 tests** — contract **9 unit + 25 integration = 34**, agent **33**, live
+**156**. The Node runner prints **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. The 7 new
 Rust tests print 27 contract refusals and 3 controls (additional to the Node summary).
 
 The Node runner calls **LiveCosigner, checkApproval, HostedBadgeResolver/checkPayee,
@@ -60,7 +60,8 @@ test-only CIS-2 registry to answer `balanceOf`.
 | Expired authorization | Approve one millisecond before TTL, then try commit at TTL; try pending approve at TTL | Co-signer; contract | `authorization_expired`; `Expired` | `attack suite 14`; `approval_one_millisecond_before_expiry_does_not_extend_ttl` (C06–C07) |
 | Transfer outlives approval | Transfer expires within the co-signer's window but beyond the authorization's shorter TTL | Co-signer | `tx_outlives_authorization` | `attack suite 15` |
 | Double co-sign / restart | Reuse the same approved auth in the same or a restarted co-signer | Co-signer + mock guard | `status_Committed` | `attack suite 16`, `17` |
-| Replica race | Two co-signers read Approved concurrently and race to commit | Co-signer + mock guard atomic commit | `commit_WrongStatus` for loser; exactly one signature | `attack suite 35` |
+| Same-authorization replica race | Two co-signers read the same Approved authorization concurrently and race to commit | Co-signer + mock guard atomic commit | `commit_WrongStatus` for loser; exactly one signature | `attack suite 35` |
+| Conflicting wallet nonce | Different authorizations request distinct transfers at one wallet nonce, sequentially or concurrently | One service's wallet lock + public reservation journal | `wallet_nonce_in_use` before commit; reservation survives lost responses and restart | `live/test/cosigner-nonces.test.mjs`; cross-replica wallet coordination remains a production requirement |
 | Double commit / replace digest | Commit a human-approved auth, then try a different digest | Contract; mock guard | `WrongStatus` | `attack suite 28`; `committed_human_approval_cannot_be_reused_or_refunded` (C02) |
 | Re-approve Approved / Committed | Owner tries to approve an already approved or committed auth | Contract; mock guard | `WrongStatus` | `attack suite 29`; same Rust test (C01, C03) |
 | Refund committed budget | Owner, agent or co-signer cancels a committed auth, then tries spending its booked budget | Contract; mock guard | `WrongStatus`, then `DailyCap` | `attack suite 30`; same Rust test (C04–C05) |

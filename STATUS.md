@@ -1,4 +1,4 @@
-# Status (2026-10-31, updated 09:30 UTC)
+# Status (2026-11-01)
 
 ## Live on Concordium testnet (details and links: docs/TESTNET.md)
 - Throwaway test identity from the **Concordium testnet IdP** (its own dummy attributes, no real
@@ -27,12 +27,17 @@
 ## Tests
 - contract: 9 unit + 25 integration = 34 (`cargo test --offline`, after `scripts/build-wasm.sh`)
 - agent (offline reference client + mock chain): 33 (`npm test`)
-- live adapters (offline, fakes for chain): 135 (`npm test`)
-- Total: **202 tests**, all passing. [Attack suite](docs/ATTACKS.md): `bash scripts/attacks.sh`;
+- live adapters (offline, fakes for chain): 156 (`npm test`)
+- Total: **223 tests**, all passing. [Attack suite](docs/ATTACKS.md): `bash scripts/attacks.sh`;
   Node runner: **32 attacks BLOCKED, 4 controls PASS, 0 unexpected**. Seven Rust attack tests
   additionally print 27 contract refusals and 3 legitimate controls.
 
 ## Changes in this round
+- Fixed paid MCP receipt loss: buyers return the committed digest, receipts need no enrichment
+  read, and identical pending/paid/uncertain purchases are reused within a server session, including after resume.
+- Co-signer service now serializes wallet operations and reserves nonces before committing, with a
+  public journal for restart recovery. Mainnet requires one signing instance per wallet or shared coordination.
+- Malformed co-signer responses become unknown outcomes, with audit evidence and no release or payment retry.
 - Added stdio MCP purchasing tools with useful synthetic data and an actual scripted client transcript
   ([integration](docs/AGENT_INTEGRATION.md)); reference mode tested, MCP testnet mode not exercised.
 - Added authenticated HTTP co-signer service/client and a buyer configuration containing wallet key 0

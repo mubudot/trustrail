@@ -55,9 +55,9 @@ export class PurchaseTools {
     if (name === 'buy_resource') {
       const key = JSON.stringify([args.url, args.intent]);
       const previous = this.requests.get(key);
-      // Identical calls in this session cannot repeat a confirmed or uncertain payment,
-      // including purchases which first waited for approval and were later resumed.
-      if (previous?.result.status === 'paid' || previous?.result.reason === 'settlement_unknown_do_not_retry') return previous.result;
+      // Reuse the original request while pending as well as after payment, so retries cannot
+      // create competing approvals or replace the cache entry for a later successful resume.
+      if (previous && ['paid', 'pending'].includes(previous.result.status)) return previous.result;
       const result = await this.agent.buy(args.url, { intent: args.intent });
       const normalized = this.#normalize(result);
       if (result.authId !== undefined) {
@@ -78,10 +78,16 @@ export class PurchaseTools {
     const view = await this.guard.authorization(BigInt(args.authId));
     if (!view) return refused('unknown_authorization', args.authId);
     const a = view.auth;
-    if (view.expired) return refused('authorization_expired', args.authId);
+    if (view.expired) {
+      purchase.result = refused('authorization_expired', args.authId);
+      return purchase.result;
+    }
     const state = tag(a.status);
     if (state === 'Pending') return { status: 'pending', reason: 'owner_approval_required', authId: args.authId };
-    if (state !== 'Approved') return refused(`status_${state}`, args.authId);
+    if (state !== 'Approved') {
+      purchase.result = refused(`status_${state}`, args.authId);
+      return purchase.result;
+    }
     if (name === 'purchase_status') return { status: 'pending', reason: 'approval_recorded_resume_to_verify', authId: args.authId };
 
     const q = purchase.quote;
