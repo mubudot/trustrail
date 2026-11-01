@@ -1,5 +1,8 @@
 import { CosignRefused } from './cosigner-live.mjs';
 
+const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const hex = (v, size) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${size}}$`).test(v);
+
 // Transport failure is deliberately distinct from a deterministic refusal: a commit may already
 // have finalized. The buyer must reconcile, never assume it is safe to cancel/retry.
 export class CosignerUnavailable extends Error {
@@ -26,18 +29,22 @@ export class CosignerClient {
         signal: AbortSignal.timeout(this.timeoutMs), redirect: 'error' });
       out = await response.json();
     } catch { throw new CosignerUnavailable(); }
-    if (response.status === 401 && out.status === 'refused' && out.reason === 'unauthenticated') throw new CosignRefused('unauthenticated');
+    if (!object(out)) throw new CosignerUnavailable();
+    if (response.status === 401) {
+      if (out.authId === null && out.status === 'refused' && out.reason === 'unauthenticated') throw new CosignRefused('unauthenticated');
+      throw new CosignerUnavailable();
+    }
     if (out.authId !== String(input.authId)) throw new CosignerUnavailable();
-    if (out.status === 'refused' && typeof out.reason === 'string') throw new CosignRefused(out.reason);
+    if (response.status === 422 && out.status === 'refused' && typeof out.reason === 'string' && out.reason.trim()) throw new CosignRefused(out.reason);
     if (!response.ok) throw new CosignerUnavailable();
     return out;
   }
 
   async cosignWithReceipt(input) {
     const out = await this.#request('cosign', input);
-    if (out.status !== 'signed' || !/^[0-9a-f]{128}$/.test(out.signature)
-      || !/^[0-9a-f]{64}$/.test(out.receipt?.commitTx) || !/^[0-9a-f]{64}$/.test(out.receipt?.digest)) throw new CosignerUnavailable();
-    return { signature: out.signature, ...out.receipt };
+    if (out.status !== 'signed' || !hex(out.signature, 128) || !object(out.receipt)
+      || !hex(out.receipt.commitTx, 64) || !hex(out.receipt.digest, 64)) throw new CosignerUnavailable();
+    return { signature: out.signature, commitTx: out.receipt.commitTx, digest: out.receipt.digest };
   }
 
   async cosign(input) {
@@ -49,9 +56,9 @@ export class CosignerClient {
 
   async releaseWithReceipt(authId) {
     const out = await this.#request('release', { authId });
-    if (out.status !== 'released' || typeof out.released !== 'boolean'
-      || (out.released && !/^[0-9a-f]{64}$/.test(out.receipt?.cancelTx))) throw new CosignerUnavailable();
-    return { released: out.released, cancelTx: out.receipt?.cancelTx ?? null };
+    if (out.status !== 'released' || typeof out.released !== 'boolean' || !object(out.receipt)
+      || (out.released ? !hex(out.receipt.cancelTx, 64) : out.receipt.cancelTx !== null)) throw new CosignerUnavailable();
+    return { released: out.released, cancelTx: out.receipt.cancelTx };
   }
 
   async release(authId) {
