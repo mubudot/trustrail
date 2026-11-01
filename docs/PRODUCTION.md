@@ -43,7 +43,9 @@ whose badge proves a verified human stands behind it.
   without touching the contract. Changing the keys of the 2-of-2 wallet itself needs both keys, so
   the custodian must hold a recoverable backup of key 1. Losing key 1 stops every payment (fail
   closed); the owner can still pause the agent in the guard (`setPaused`) and withdraw escrow.
-- The audit-log head is anchored after each run; `npm run verify` is the check an auditor runs.
+- Audit anchoring: in the demo the log head was anchored by an explicit step
+  (`node demo/testnet.mjs anchor`, which calls `anchorAudit`). In production the operator anchors on a
+  schedule, e.g. after each batch of purchases; `npm run verify` is the check an auditor runs.
 
 ## What it costs
 
@@ -56,7 +58,8 @@ transactions with `(cd live && npm run costs)` (read-only, no keys), medians per
 | Small (at or below the threshold) | `authorize` + `commitPayment` + x402 settlement + `recordSettlement` + ¼ of an audit anchor | ≈ 5,550 | ≈ €0.11 |
 | Large (human-approved) | the same + verification-request anchor + approval-record anchor + `approve` | ≈ 7,930 | ≈ €0.16 |
 
-Roughly 4–5 transactions per purchase is the price of putting every step on chain; for purchases of
+Four transactions per small purchase and seven per human-approved one (plus a share of the audit
+anchor) is the price of putting every step on chain; for purchases of
 a few euros or more it is small, for sub-cent API calls it is not. Two levers for production (not
 implemented yet):
 batch micro-purchases under one authorisation (a prepaid allowance per seller and day), and anchor

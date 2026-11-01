@@ -19,7 +19,8 @@ What is left needs your account or your decision:
    assistant to do it with your saved Encode login.
 2. **Say when the repository may go public.** The final submission needs a public repo. The
    history has been scanned for secrets and personal data; `live/.secrets/` is gitignored.
-3. **Approve the demo video upload** (YouTube, unlisted is enough) when you have reviewed it.
+3. **Approve the demo video upload** (YouTube, unlisted is enough) when you have reviewed it. Its
+   public URL then goes into the README "Judge start" line and [SUBMISSION.md](SUBMISSION.md).
 4. **Keep the Agent Card host up until judging ends, or approve moving the cards.** The two badges
    are only `VALID` while their cards are served at the pinned URL (today a temporary host on the
    project VPS). Once the repo is public the cards can move to GitHub Pages; that needs one free
