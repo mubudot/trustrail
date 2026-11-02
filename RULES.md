@@ -20,7 +20,7 @@ Sources:
 | Tracks | **None.** The five directions are "starting points, not tracks": existing agent + badge/ERC-8004/x402; verified agents (registry + Agent Card + badge check over MCP/A2A); private verified users (Concordium ID / Verify and Access, e.g. age gate); agent commerce (x402 + sponsored transactions); accountable agents (EU AI Act Art. 12 audit trail, lawful route back to an owner). |
 | Prizes | **Not published** anywhere on the programme page or in the Terms. The Terms only say: "All prize announcements made at The Event are tentative and subject to change." Re-check at the 2 Nov launch. |
 | Solo | Allowed (FAQ 5: "You can build solo or in a team"). |
-| Eligibility | No country/region restriction, no KYC and no sanctions clause published. Only rule: under-18s need parent/guardian consent. Governing law England & Wales. Nothing excludes Taiwan or Japan. |
+| Eligibility | No country/region restriction, no KYC and no sanctions clause published. Only rule: under-18s need parent/guardian consent. Governing law England & Wales. |
 | AI tools | No policy published (neither page nor Terms). Disclose AI assistance in the README anyway. |
 | IP | Participants own what they build (Terms, "Intellectual Property Rights"). Encode may share registration details with sponsors and send marketing. |
 
